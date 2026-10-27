@@ -46,3 +46,7 @@
 body.dark-mode .gps-ficha{color-scheme:light}
 @media(max-width:760px){.gf-layout{grid-template-columns:1fr}.gf-editor{order:2}.gf-right{order:1}.gf-header{padding:18px}.gf-preview-top{padding:22px}}
 @media(max-width:420px){.gf-actions{grid-template-columns:1fr}.gf-logo{display:none}.gf-preview-top h3{max-width:100%}.gf-data{gap:7px}}
+/* Vista previa que se adapta al ancho disponible dentro del editor */
+.gf-live-preview .sg-layout{grid-template-columns:1fr}
+.gf-live-preview .sg-hero h1{font-size:clamp(24px,3vw,31px)}
+.gf-live-preview .sg-card{box-shadow:0 13px 34px #174c351d}
