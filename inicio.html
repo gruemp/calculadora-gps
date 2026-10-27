@@ -171,7 +171,7 @@
         } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
       }
       function setDiagnostic(message) { el('diagnostic').textContent=message; }
-      GpsCards.init({getMeta:(k)=>state.locationDetails[k]||{},setMeta:(k,v)=>{state.locationDetails[k]=v;store();renderRecords();renderFavorites();}});
+      window.GpsCards.init({getMeta:(k)=>state.locationDetails[k]||{},setMeta:(k,v)=>{state.locationDetails[k]=v;store();renderRecords();renderFavorites();}});
       function appendLocation(p) {
         const loc = normalize(p), dk = dateKey(loc.timestamp), hk = hourKey(loc.timestamp);
         if (!state.days[dk]) state.days[dk]={date:dk,hours:{}};
@@ -328,7 +328,7 @@
         const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
         const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
         const ficha=document.createElement('button');ficha.type='button';ficha.textContent='Ver ficha y compartir';ficha.className='mini';
-        ficha.style.marginTop='8px';ficha.addEventListener('click',()=>GpsCards.open(p,kind));
+        ficha.style.marginTop='8px';ficha.addEventListener('click',()=>window.GpsCards.open(p,kind));
         wrapper.append(title,document.createElement('br'),coords,time,link,document.createElement('br'),ficha);
         return wrapper;
       }
@@ -384,13 +384,13 @@
       function recordRow(p,withFavorite=true) {
         const row=document.createElement('div');row.className='record';
         const info=document.createElement('div');info.className='record-main';
-        const t=document.createElement('strong');const cardMeta=state.locationDetails[GpsCards.key(p)]||{};t.textContent=(cardMeta.name?cardMeta.name+' · ':'')+fmtTime(p.timestamp);
+        const t=document.createElement('strong');const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};t.textContent=(cardMeta.name?cardMeta.name+' · ':'')+fmtTime(p.timestamp);
         const c=document.createElement('small');c.textContent=formatCoords(p)+(Number.isFinite(p.accuracy)?' · ±'+Math.round(p.accuracy)+' m':'');
         info.append(t,c);
         const actions=document.createElement('div');actions.className='record-actions';
         actions.append(btn('Ver mapa',()=>{el('dateSelector').value=dateKey(p.timestamp);state.mapSelectedDate=dateKey(p.timestamp);renderFilters();el('hourSelector').value=hourKey(p.timestamp);state.mapSelectedHour=hourKey(p.timestamp);store();renderMap(true);el('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});}));
         actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
-        actions.append(btn('Ficha / compartir',()=>GpsCards.open(p,'registro')));
+        actions.append(btn('Ficha / compartir',()=>window.GpsCards.open(p,'registro')));
         if(withFavorite) actions.append(btn('★ Favorito',()=>{state.favorites.push(Object.assign({},p,{label:fmtTime(p.timestamp)}));store();renderAll();}));
         actions.append(btn('Eliminar',()=>{deleteLocation(p);},true));
         row.append(info,actions);return row;
@@ -432,12 +432,12 @@
         favs.forEach((p)=>{
           const row=document.createElement('div');row.className='record';
           const info=document.createElement('div');info.className='record-main';
-          const title=document.createElement('strong');const cardMeta=state.locationDetails[GpsCards.key(p)]||{};title.textContent=cardMeta.name||p.label||fmtTime(p.timestamp);
+          const title=document.createElement('strong');const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};title.textContent=cardMeta.name||p.label||fmtTime(p.timestamp);
           const details=document.createElement('small');details.textContent=formatCoords(p)+' · '+fmtTime(p.timestamp);
           info.append(title,details);
           const actions=document.createElement('div');actions.className='record-actions';
           actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
-          actions.append(btn('Ficha / compartir',()=>GpsCards.open(p,'favorito')));
+          actions.append(btn('Ficha / compartir',()=>window.GpsCards.open(p,'favorito')));
           actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);store();renderAll();}},true));
           row.append(info,actions);root.append(row);
         });
@@ -531,7 +531,7 @@
       el('toggleBtn').addEventListener('click',()=>state.isRunning?stopTracking():startTracking());
       el('captureBtn').addEventListener('click',()=>capture('history'));
       el('favoriteBtn').addEventListener('click',()=>capture('favorite'));
-      el('lastFichaBtn').addEventListener('click',()=>{if(state.lastLocation)GpsCards.open(state.lastLocation,'registro');});
+      el('lastFichaBtn').addEventListener('click',()=>{if(state.lastLocation)window.GpsCards.open(state.lastLocation,'registro');});
       el('centerBtn').addEventListener('click',()=>renderMap(true));
       el('dateSelector').addEventListener('change',(e)=>{state.mapSelectedDate=e.target.value;state.mapSelectedHour='all';renderFilters();store();renderMap(true);});
       el('hourSelector').addEventListener('change',(e)=>{state.mapSelectedHour=e.target.value;store();renderMap(true);});
