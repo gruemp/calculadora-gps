@@ -594,6 +594,11 @@
       }
 
 
+      // Botones compactos del popup de Leaflet (las tarjetas usan location-action).
+      function btn(text,action,danger=false){
+        const b=document.createElement('button');b.type='button';b.textContent=text;b.className='mini'+(danger?' danger':'');
+        b.addEventListener('click',action);return b;
+      }
       // Los iconos se crean a partir de un repertorio fijo; nunca se inserta HTML de datos GPS.
       const locationIcons={
         pin:'<path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
