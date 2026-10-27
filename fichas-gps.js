@@ -140,7 +140,7 @@ async function png(x){
  if(!ctx)throw Error('Este navegador no puede generar imágenes PNG.');
  const entries=[['UBICACIÓN',x.name||'Punto GPS'],['TIPO',x.kind==='favorito'?'Favorito':'Registro GPS'],['FECHA Y HORA',when(x.p)],['COORDENADAS',coords(x.p)],['PRECISIÓN',Number.isFinite(x.p.accuracy)?'±'+Math.round(x.p.accuracy)+' metros':'No informada'],['REFERENCIA',x.address],['OBSERVACIONES',x.notes],['CONTACTO',x.contactName],['TELÉFONO',x.number],['GOOGLE MAPS',x.maps],['CÓMO LLEGAR',x.route],['OPENSTREETMAP',x.osm],['WHATSAPP',x.wa]].filter(row=>row[1]);
  const data=entries.map(row=>{const f=['GOOGLE MAPS','CÓMO LLEGAR','OPENSTREETMAP','WHATSAPP'].includes(row[0])?19:29;ctx.font=f+'px system-ui';const lines=wrap(ctx,row[1],900);return{label:row[0],lines,font:f,height:34+lines.length*(f+12)+24};});
- const w=1080,h=320+data.reduce((t,r)=>t+r.height,0)+160;
+ const w=1080,h=320+data.reduce((t,r)=>t+r.height,0)+250;
  if(h>14000)throw Error('Demasiado contenido para crear un PNG.');
  canvas.width=w;canvas.height=h;
  const gradient=ctx.createLinearGradient(0,0,0,h);gradient.addColorStop(0,'#eff6f1');gradient.addColorStop(1,'#e2f0e8');ctx.fillStyle=gradient;ctx.fillRect(0,0,w,h);
