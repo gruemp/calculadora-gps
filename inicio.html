@@ -176,7 +176,7 @@
             mapSelectedDate:state.mapSelectedDate,mapSelectedHour:state.mapSelectedHour,
             showFavorites:state.showFavorites,mapView:state.mapView,csvUrl:state.csvUrl,
             accuracyLimit:state.accuracyLimit,addresses:state.addresses,geoapifyKey:state.geoapifyKey,
-            ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}) ,
+            ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}),
             cyclesCompleted:allLocations().length
           }));
         } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
@@ -293,7 +293,7 @@
         measurement.textContent=state.currentFix?'Referencia de distancia: GPS actual · ±'+Math.round(state.currentFix.accuracy)+' m · '+fmtTime(state.currentFix.timestamp)+(state.selectedMeasure?' · Destino: '+distanceLabel(state.currentFix,state.selectedMeasure):' · distancias indicadas junto a cada registro'):'Sin referencia actual. Pulsa «Medir desde mi ubicación» para obtener distancias.';
         loc.replaceChildren();
         if (!state.lastLocation) {loc.textContent='Sin posición disponible todavía.';return;}
-        const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=formatCoords(state.lastLocation);
+        const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=addressOf(state.lastLocation)||formatCoords(state.lastLocation);
         loc.append(link,document.createElement('br'),document.createTextNode(fmtTime(state.lastLocation.timestamp)));
       }
       function fillSelect(select,choices,wanted) {
@@ -343,12 +343,14 @@
         const title=document.createElement('strong');title.textContent=label;
         const coords=document.createElement('div');coords.textContent=formatCoords(p);
         const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
-        const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
-        const addr=addressOf(p);if(addr){const address=document.createElement('div');address.textContent='Dirección: '+addr;wrapper.append(address);}
+        const link=document.createElement('a');link.href=mapLink(p);link.textContent=addressOf(p)||'Abrir coordenadas en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
+        const addr=addressOf(p);
         if(state.currentFix){const distance=document.createElement('div');distance.textContent='Desde tu ubicación: '+distanceLabel(state.currentFix,p)+' en línea recta';wrapper.append(distance);}
         const copy=btn('Copiar datos',()=>copyLocation(p));const share=btn('Compartir',()=>shareLocation(p));
         const measure=btn('Medir distancia',()=>measureFromHere(p));
-        wrapper.append(title,document.createElement('br'),coords,time,link,document.createElement('br'),copy,share,measure);
+        wrapper.append(title,document.createElement('br'),coords,time);
+        if(addr){const address=document.createElement('div');address.textContent='Dirección: '+addr;wrapper.append(address);}
+        wrapper.append(link,document.createElement('br'),copy,share,measure);
         return wrapper;
       }
       function renderMap(forceFit=false) {
@@ -485,7 +487,8 @@
         catch(err){if(err.name!=='AbortError')setDiagnostic('Error al compartir: '+err.message);}
       }
       function allData(){const a=allLocations(),fav=state.favorites.filter(valid);return ['CONTROL GPS · DATOS COMPARTIDOS','Registros: '+a.length+' · Favoritos: '+fav.length,'','REGISTROS',...a.map((p,i)=>'\n#'+(i+1)+'\n'+dataFor(p)),'','FAVORITOS',...fav.map((p,i)=>'\n★ '+(i+1)+'\n'+dataFor(p))].join('\n');}
-      async function copyAll(){try{await copyText(allData());setDiagnostic('Todos los registros y favoritos copiados con sus enlaces de Google Maps. Solo se incluyen direcciones ya guardadas.');}catch(err){setDiagnostic('Error al copiar todo: '+err.message);}}
+      function htmlAll(){const records=allLocations(),favorites=state.favorites.filter(valid);return '<div style="font:14px/1.6 system-ui,sans-serif"><strong>CONTROL GPS · DATOS COMPARTIDOS</strong><h3>Registros</h3>'+records.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'<h3>Favoritos</h3>'+favorites.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'</div>';}
+      async function copyAll(){try{await copyText(allData(),htmlAll());setDiagnostic('Todos los registros y favoritos copiados con sus enlaces de Google Maps. Solo se incluyen direcciones ya guardadas.');}catch(err){setDiagnostic('Error al copiar todo: '+err.message);}}
       async function shareAll(){
         const content=allData();
         try{if(navigator.share){await navigator.share({title:'Historial Control GPS',text:content});setDiagnostic('Historial enviado al menú de compartir.');}
