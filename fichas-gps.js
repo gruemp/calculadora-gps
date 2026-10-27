@@ -136,7 +136,7 @@ function create(){
  });
  action('gfShareWa',async x=>{
    const url='https://api.whatsapp.com/send?text='+encodeURIComponent('Ficha GPS interactiva: '+(x.name||'Ubicación')+'\n'+shareUrl(x));
-   const popup=window.open(url,'_blank','noopener,noreferrer');if(!popup&&global.location)global.location.href=url;
+   const popup=window.open(url,'_blank');if(popup)popup.opener=null;else if(global.location)global.location.href=url;
    status('Se abrió WhatsApp con el enlace a la ficha; sus botones funcionan al abrirla en un navegador.');
  });
  action('gfHtml',async x=>{
