@@ -122,7 +122,7 @@
       const fmtTime = (t) => new Date(t).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'medium'});
       const num = (v) => Number(v);
       const valid = (loc) => loc && Number.isFinite(num(loc.latitude)) && Number.isFinite(num(loc.longitude)) && Math.abs(num(loc.latitude)) <= 90 && Math.abs(num(loc.longitude)) <= 180 && Number.isFinite(num(loc.timestamp)) && num(loc.timestamp)>0;
-      const normalize = (loc) => ({latitude:num(loc.latitude),longitude:num(loc.longitude),accuracy:Number.isFinite(num(loc.accuracy)) ? num(loc.accuracy):null,timestamp:num(loc.timestamp)});
+      const normalize = (loc) => ({latitude:num(loc.latitude),longitude:num(loc.longitude),accuracy:loc.accuracy!==null && loc.accuracy!==undefined && loc.accuracy!=='' && Number.isFinite(num(loc.accuracy)) ? num(loc.accuracy):null,timestamp:num(loc.timestamp)});
       const mapLink = (p) => 'https://www.google.com/maps/search/?api=1&query=' + p.latitude + ',' + p.longitude;
       const formatCoords = (p) => p.latitude.toFixed(6) + ', ' + p.longitude.toFixed(6);
       const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } })();
@@ -301,7 +301,8 @@
         }
         try {
           map=L.map('leafletMap',{preferCanvas:true}).setView([18,0],2);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+          const tiles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+          let tileFailures=0;tiles.on('tileerror',()=>{if(++tileFailures===4)setDiagnostic('No se descargan las imágenes del mapa. Comprueba tu conexión o los bloqueos de OpenStreetMap.');});
           overlays=L.layerGroup().addTo(map);
           if (state.mapView && Array.isArray(state.mapView.center) && state.mapView.center.length===2 && state.mapView.center.every(Number.isFinite) && Number.isFinite(state.mapView.zoom)) {
             map.setView(state.mapView.center,Math.min(19,Math.max(2,state.mapView.zoom)));
@@ -479,9 +480,16 @@
         throw new Error('El JSON no contiene ubicaciones reconocibles.');
       }
       async function importText(text,isJson) {
+        const data=isJson?JSON.parse(text):null;
         const items=isJson?itemsFromJson(text):itemsFromCsv(text);
         const count=mergeLocations(items);
-        const message='Importación: '+count+' registros nuevos de '+items.length+' válidos.';
+        let favoritesAdded=0;
+        if(data && Array.isArray(data.favorites)){
+          const known=new Set(state.favorites.map((p)=>[p.timestamp,p.latitude,p.longitude].join('|')));
+          data.favorites.forEach((f)=>{if(!valid(f))return;const p=Object.assign(normalize(f),{label:String(f.label||'')});const key=[p.timestamp,p.latitude,p.longitude].join('|');if(!known.has(key)){known.add(key);state.favorites.push(p);favoritesAdded++;}});
+          if(favoritesAdded){store();renderAll(true);}
+        }
+        const message='Importación: '+count+' registros nuevos de '+items.length+' válidos y '+favoritesAdded+' favoritos.';
         el('importStatus').textContent=message;setDiagnostic(message);
       }
       function exportData() {
