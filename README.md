@@ -24,6 +24,20 @@ Aplicación web de seguimiento GPS y visualización de ubicaciones con Leaflet/O
 - **Importar CSV de la URL** lee un enlace HTTPS accesible que permita CORS. Si la hoja está restringida, descarga el CSV e impórtalo localmente en lugar de publicarla.
 - La importación omite duplicados basados en fecha, hora y coordenadas.
 
+
+## Fichas de ubicaciones y contacto
+
+Desde **Registros**, **Favoritos**, **Última posición** o un marcador del mapa, abre **Ficha / compartir**:
+
+1. Asigna un nombre al lugar, un nombre de contacto, teléfono con indicativo, referencia y observaciones.
+2. Pulsa **Guardar datos de este punto**. Estos campos quedan asociados exclusivamente a la ubicación seleccionada.
+3. Usa **Copiar texto clicable** (texto enriquecido HTML y URLs cuando el dispositivo lo admite), **Compartir texto**, **Enviar por WhatsApp**, **Descargar HTML clicable**, **Descargar PNG** o **Compartir PNG**.
+4. La tarjeta incorpora coordenadas, fecha/hora, precisión, mapas, indicaciones, llamada y WhatsApp según los datos disponibles.
+
+Los archivos HTML contienen enlaces interactivos; el PNG es una imagen sin enlaces interactivos. Los datos de contacto solo se incluyen al elegir conscientemente una opción de envío/descarga. Todas las conversiones se realizan en el navegador, sin un servicio externo de generación de imágenes.
+
+La opción **Descargar copia JSON** ahora incluye los detalles guardados de cada ficha en `locationDetails`. La importación de esta versión restaura los datos de contacto, respetando las ubicaciones locales ya existentes.
+
 ## Limitaciones y privacidad
 
 - Las coordenadas se almacenan en el dispositivo mediante `localStorage`. No se envían automáticamente a Google Sheets.
