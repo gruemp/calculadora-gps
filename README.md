@@ -25,18 +25,20 @@ Aplicación web de seguimiento GPS y visualización de ubicaciones con Leaflet/O
 - La importación omite duplicados basados en fecha, hora y coordenadas.
 
 
-## Fichas de ubicaciones y contacto
 
-Desde **Registros**, **Favoritos**, **Última posición** o un marcador del mapa, abre **Ficha / compartir**:
+## Fichas interactivas y PNG
 
-1. Asigna un nombre al lugar, un nombre de contacto, teléfono con indicativo, referencia y observaciones.
-2. Pulsa **Guardar datos de este punto**. Estos campos quedan asociados exclusivamente a la ubicación seleccionada.
-3. Usa **Copiar texto clicable** (texto enriquecido HTML y URLs cuando el dispositivo lo admite), **Compartir texto**, **Enviar por WhatsApp**, **Descargar HTML clicable**, **Descargar PNG** o **Compartir PNG**.
-4. La tarjeta incorpora coordenadas, fecha/hora, precisión, mapas, indicaciones, llamada y WhatsApp según los datos disponibles.
+Desde cualquier ubicación del historial o de favoritos selecciona **Ficha / compartir**. Personaliza nombre del lugar, contacto, teléfono, referencia y observaciones; después guarda los datos.
 
-Los archivos HTML contienen enlaces interactivos; el PNG es una imagen sin enlaces interactivos. Los datos de contacto solo se incluyen al elegir conscientemente una opción de envío/descarga. Todas las conversiones se realizan en el navegador, sin un servicio externo de generación de imágenes.
+La ficha exportada muestra **cada dato una sola vez**. Incluye nombre, fecha y hora, coordenadas, precisión cuando existe, referencia, contacto y observaciones solo si se han registrado. No inventa fotos, mapas incrustados, altitud o dirección automática.
 
-La opción **Descargar copia JSON** ahora incluye los detalles guardados de cada ficha en `locationDetails`. La importación de esta versión restaura los datos de contacto, respetando las ubicaciones locales ya existentes.
+- **Enviar ficha por WhatsApp:** crea un enlace a `ficha-compartida.html` con los datos codificados en el fragmento de la URL. WhatsApp presenta el enlace en el chat; al abrirlo en un navegador aparece la ficha HTML con botones internos de Maps, indicaciones, llamada y WhatsApp. **No es una tarjeta interactiva dentro del propio chat de WhatsApp.**
+- **Compartir enlace interactivo:** usa el menú de compartir del teléfono, o copia la URL en navegadores sin soporte.
+- **Descargar HTML interactivo:** archivo autocontenido con estilos y botones clicables, que se puede enviar como documento. Para usarlo, el destinatario debe abrirlo en un navegador; algunas aplicaciones bloquean archivos HTML o no permiten compartirlos.
+- **Compartir archivo HTML:** usa la función de archivos del sistema cuando existe y el destino la admite. Si no, descarga el HTML para adjuntarlo manualmente como documento.
+- **Descargar o compartir PNG:** mantiene el mismo estilo y los mismos datos disponibles. El PNG es una imagen estática, por lo que no permite tocar botones.
+
+**Privacidad:** cualquier persona que tenga el enlace a la ficha compartida puede leer la ubicación, el contacto, el teléfono y las observaciones incluidos. El enlace contiene los datos en su fragmento (`#f=...`), no se almacenan en un servidor de fichas. No compartas información privada sin autorización. Las fichas solo se generan al solicitar el envío. La copia JSON conserva `locationDetails`, y la importación permite restaurarlos.
 
 ## Limitaciones y privacidad
 
