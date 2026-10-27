@@ -323,13 +323,21 @@
       }
       function markerPopup(p,label,kind='registro') {
         const wrapper=document.createElement('div');
-        const title=document.createElement('strong');title.textContent=label;
+        const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};
+        const title=document.createElement('strong');title.textContent=cardMeta.name||label;
         const coords=document.createElement('div');coords.textContent=formatCoords(p);
         const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
         const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
         const ficha=document.createElement('button');ficha.type='button';ficha.textContent='Ver ficha y compartir';ficha.className='mini';
         ficha.style.marginTop='8px';ficha.addEventListener('click',()=>window.GpsCards.open(p,kind));
-        wrapper.append(title,document.createElement('br'),coords,time,link,document.createElement('br'),ficha);
+        wrapper.append(title,document.createElement('br'),coords,time,link);
+        if(cardMeta.contactName||cardMeta.contactPhone){
+          const contact=document.createElement('div');contact.textContent='Contacto: '+(cardMeta.contactName||'Sin nombre');wrapper.append(contact);
+          const number=String(cardMeta.contactPhone||'').trim();if(/^\+?[\d ()-]{7,26}$/.test(number)){
+            const call=document.createElement('a');call.href='tel:'+number.replace(/[^+\d]/g,'');call.textContent='Llamar: '+number;wrapper.append(call);
+          }
+        }
+        wrapper.append(document.createElement('br'),ficha);
         return wrapper;
       }
       function renderMap(forceFit=false) {
@@ -403,6 +411,7 @@
         bucket.locations.splice(i,1);
         if(!bucket.locations.length) delete state.days[dk].hours[hk];
         if(!Object.keys(state.days[dk].hours).length) delete state.days[dk];
+        if(!state.favorites.some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)) && !allLocations().some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)))delete state.locationDetails[window.GpsCards.key(p)];
         store();renderAll();
       }
       function renderRecords() {
@@ -438,7 +447,7 @@
           const actions=document.createElement('div');actions.className='record-actions';
           actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
           actions.append(btn('Ficha / compartir',()=>window.GpsCards.open(p,'favorito')));
-          actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);store();renderAll();}},true));
+          actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);if(!state.favorites.some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p))&&!allLocations().some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)))delete state.locationDetails[window.GpsCards.key(p)];store();renderAll();}},true));
           row.append(info,actions);root.append(row);
         });
       }
