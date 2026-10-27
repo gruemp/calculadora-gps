@@ -153,6 +153,13 @@
         csvUrl: saved.csvUrl || '',
         isRunning: false
       };
+      // Conservar las direcciones escritas en versiones anteriores al retirar las fichas.
+      if(state.legacyDetails){for(const [oldKey,value] of Object.entries(state.legacyDetails)){
+        const parts=oldKey.split('|');if(parts.length!==3||!value||typeof value.address!=='string'||!value.address.trim())continue;
+        const lat=Number(parts[1]),lng=Number(parts[2]);if(!Number.isFinite(lat)||Math.abs(lat)>90||!Number.isFinite(lng)||Math.abs(lng)>180)continue;
+        const k=lat.toFixed(6)+','+lng.toFixed(6);
+        if(!state.addresses[k])state.addresses[k]={address:value.address.trim().slice(0,250),source:'manual (migrada)'};
+      }}
       let map = null, overlays = null, nextCaptureAt = 0, ticker = null, captureBusy = false, mapSaveTimeout = null, lastFitKey = '';
       function allLocations() {
         const result = [];
@@ -450,7 +457,11 @@
           if(!valid(p))throw Error('El GPS no devolvió coordenadas válidas.');
           if(!Number.isFinite(p.accuracy)||p.accuracy<0||p.accuracy>state.accuracyLimit)throw Error('Precisión insuficiente: '+(Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'no indicada')+'. Configurado: ±'+state.accuracyLimit+' m como máximo.');
           state.currentFix=normalize(p);state.selectedMeasure=target;
-          renderAll();setDiagnostic(target?'Distancia en línea recta: '+distanceLabel(p,target)+' (GPS actual ±'+Math.round(p.accuracy)+' m).':'Distancias calculadas desde la posición actual. GPS ±'+Math.round(p.accuracy)+' m.');
+          renderAll();
+          if(target&&map){const corners=[[p.latitude,p.longitude],[target.latitude,target.longitude]];
+            if(haversine(p,target)<5)map.setView(corners[0],17);
+            else map.fitBounds(corners,{padding:[45,45],maxZoom:16});}
+          setDiagnostic(target?'Distancia en línea recta: '+distanceLabel(p,target)+' (GPS actual ±'+Math.round(p.accuracy)+' m).':'Distancias calculadas desde la posición actual. GPS ±'+Math.round(p.accuracy)+' m.');
         }catch(err){setDiagnostic('No se pudo medir: '+readableError(err));}
         finally{b.disabled=false;b.textContent='Medir desde mi ubicación';}
       }
@@ -650,7 +661,7 @@
         el('importStatus').textContent=message;setDiagnostic(message);
       }
       function exportData() {
-        const json=JSON.stringify({version:4,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,addresses:state.addresses,accuracyLimit:state.accuracyLimit},null,2);
+        const json=JSON.stringify({version:4,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,addresses:state.addresses,accuracyLimit:state.accuracyLimit,...(state.legacyDetails?{locationDetails:state.legacyDetails}:{})},null,2);
         const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
         const a=document.createElement('a');a.href=url;a.download='control-gps-'+dateKey(Date.now())+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }
