@@ -330,8 +330,17 @@
         if(!initMap()) return;
         overlays.clearLayers();
         const bounds=[];
+        const secondaryBounds=[];
         if(points.length>1) {
-          L.polyline(points.map((p)=>[p.latitude,p.longitude]),{color:'#147eae',weight:4,opacity:.8}).addTo(overlays);
+          let segment=[points[0]];
+          const drawSegment=()=>{if(segment.length>1)L.polyline(segment.map((p)=>[p.latitude,p.longitude]),{color:'#147eae',weight:4,opacity:.8}).addTo(overlays);};
+          for(let i=1;i<points.length;i++){
+            const gap=points[i].timestamp-points[i-1].timestamp;
+            if(dateKey(points[i].timestamp)!==dateKey(points[i-1].timestamp)||gap>Math.max(1800000,state.cycleDuration*4)){
+              drawSegment();segment=[points[i]];
+            }else segment.push(points[i]);
+          }
+          drawSegment();
         }
         points.forEach((p,i)=>{
           const color=i===0?'#169b62':i===points.length-1?'#c8424c':'#147eae';
@@ -341,21 +350,22 @@
         if(state.showFavorites) {
           state.favorites.filter(valid).forEach((f)=>{
             L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'))).addTo(overlays);
-            bounds.push([f.latitude,f.longitude]);
+            secondaryBounds.push([f.latitude,f.longitude]);
           });
         }
         if(valid(state.lastLocation)) {
           const p=state.lastLocation;
           L.circleMarker([p.latitude,p.longitude],{radius:10,color:'#fff',weight:3,fillColor:'#2089f5',fillOpacity:1}).bindPopup(markerPopup(p,'Última posición conocida')).addTo(overlays);
-          bounds.push([p.latitude,p.longitude]);
+          secondaryBounds.push([p.latitude,p.longitude]);
         }
         const note=el('mapMessage');
         note.hidden=points.length>0;
         if(!points.length) note.textContent=state.lastLocation?'No hay registros para este filtro. La última posición se muestra en azul.':'Todavía no hay registros para este filtro. Inicia el GPS o importa un historial.';
         const fitKey=state.mapSelectedDate+'|'+state.mapSelectedHour+'|'+state.showFavorites;
-        if(bounds.length && (forceFit||fitKey!==lastFitKey)) {
-          if(bounds.length===1) map.setView(bounds[0],15);
-          else map.fitBounds(bounds,{padding:[42,42],maxZoom:16});
+        const fitBounds=bounds.length?bounds:secondaryBounds;
+        if(fitBounds.length && (forceFit||fitKey!==lastFitKey)) {
+          if(fitBounds.length===1) map.setView(fitBounds[0],15);
+          else map.fitBounds(fitBounds,{padding:[42,42],maxZoom:16});
         }
         lastFitKey=fitKey;
         setTimeout(()=>{if(map)map.invalidateSize();},60);
