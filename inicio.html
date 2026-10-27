@@ -97,7 +97,7 @@
       .location-actionbar{padding:12px;gap:10px}
       .location-primary{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
       .location-primary .location-action{white-space:normal;text-align:center}
-      .location-tools{width:100%;margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:start;gap:7px}
+      .location-tools{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:7px}
       .location-tools>.location-action,.location-tools>.location-more>summary{width:100%;min-width:0;padding:9px 4px;font-size:11px;gap:5px}
       .location-tools .location-action .ui-svg{width:15px;height:15px}
       .location-more[open]{grid-column:1/-1;width:100%}
@@ -668,7 +668,8 @@
         const heading=document.createElement('div');heading.className='location-heading';
         heading.append(uiText('div',isFavorite?'UBICACIÓN FAVORITA':'REGISTRO GPS','location-kicker'));
         const title=document.createElement('strong');title.className='location-title';
-        title.textContent=isFavorite&&p.label?p.label:new Date(p.timestamp).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit',second:'2-digit'});
+        const favoriteLabel=String(p.label||'').trim();
+        title.textContent=isFavorite&&favoriteLabel&&favoriteLabel!==fmtTime(p.timestamp)?favoriteLabel:new Date(p.timestamp).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit',second:'2-digit'});
         heading.append(title,uiText('div',new Date(p.timestamp).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}),'location-subtitle'));
         identity.append(pin,heading);
         const quality=document.createElement('span');quality.className='location-accuracy';
@@ -728,7 +729,6 @@
         bar.append(main,tools);card.append(bar);
         return card;
       }
-      function recordRow(p){return locationCard(p,false);}
       function deleteLocation(p) {
         const dk=dateKey(p.timestamp), hk=hourKey(p.timestamp), bucket=state.days[dk]&&state.days[dk].hours&&state.days[dk].hours[hk];
         if(!bucket || !Array.isArray(bucket.locations)) return;
