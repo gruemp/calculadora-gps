@@ -198,14 +198,16 @@
       }
       function mergeLocations(items) {
         const keys = new Set(allLocations().map((p) => [p.timestamp,p.latitude,p.longitude].join('|')));
-        let added=0;
+        let added=0,addressAdded=0;
         for (const input of items) {
           if (!valid(input)) continue;
           const loc=normalize(input), key=[loc.timestamp,loc.latitude,loc.longitude].join('|');
+          const rawAddress=typeof input.address==='string'?input.address.trim().slice(0,250):'';
+          if(rawAddress){const ak=addressKey(loc);if(!state.addresses[ak]){state.addresses[ak]={address:rawAddress,source:'importada'};addressAdded++;}}
           if (keys.has(key)) continue;
           keys.add(key);appendLocation(loc);added++;
         }
-        if (added) { store();renderAll(true); }
+        if (added||addressAdded) { store();renderAll(true); }
         return added;
       }
       function readableError(e) {
@@ -625,7 +627,7 @@
           const numericTimestamp=Number(rawTimestamp);
           const timestamp=rawTimestamp?(Number.isFinite(numericTimestamp)&&numericTimestamp>0?(numericTimestamp<1e11?numericTimestamp*1000:numericTimestamp):Date.parse(rawTimestamp)):
             parseTimestamp(field(row,['fecha','date']),field(row,['hora','time']));
-          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null};
+          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null,address:field(row,['direccion','direccion completa','direccion aproximada','address','full address'])||''};
         }).filter(valid);
       }
       function itemsFromJson(text) {
