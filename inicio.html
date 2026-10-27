@@ -7,6 +7,7 @@
   <meta name="description" content="Panel de control y visualización de recorridos GPS.">
   <title>Control GPS | Seguimiento y mapa</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="fichas-gps.css?v=20261027-1">
   <style>
     :root{color-scheme:light;--bg:#edf3f7;--panel:#fff;--ink:#192f42;--muted:#607489;--line:#d9e4ed;--brand:#086e9e;--brand2:#064f76;--positive:#147d54;--negative:#b54343;--gold:#a66811;--shadow:0 10px 32px rgba(26,55,76,.07)}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:var(--brand)}
@@ -45,7 +46,7 @@
         <div class="metric"><div class="metric-label">Registros guardados</div><div class="metric-value" id="totalCount">0</div></div>
         <div class="metric"><div class="metric-label">Intervalo</div><div class="metric-value" id="intervalText">5 min</div></div>
       </div>
-      <div class="last-position wide"><strong>Última posición conocida</strong><div id="lastLocation">Sin posición disponible todavía.</div></div>
+      <div class="last-position wide"><strong>Última posición conocida</strong><div id="lastLocation">Sin posición disponible todavía.</div><button type="button" class="btn" id="lastFichaBtn" style="margin-top:10px" disabled>Ver ficha de última ubicación</button></div>
       <div class="actions wide">
         <button class="btn btn-primary btn-wide" id="toggleBtn" type="button">Iniciar seguimiento</button>
         <button class="btn" id="captureBtn" type="button">Registrar ubicación</button>
@@ -112,6 +113,7 @@
   </main>
   <footer class="foot">Control GPS · Mapas de © OpenStreetMap · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="fichas-gps.js?v=20261027-1"></script>
   <script>
     (function () {
       'use strict';
@@ -136,6 +138,7 @@
         mapSelectedDate: saved.mapSelectedDate || 'all',
         mapSelectedHour: saved.mapSelectedHour || 'all',
         showFavorites: saved.showFavorites !== false,
+        locationDetails: saved.locationDetails && typeof saved.locationDetails === 'object' && !Array.isArray(saved.locationDetails) ? saved.locationDetails : {},
         mapView: saved.mapView || null,
         csvUrl: saved.csvUrl || '',
         isRunning: false
@@ -162,11 +165,13 @@
             cycleDuration:state.cycleDuration,autoStart:state.autoStart,darkMode:state.darkMode,
             mapSelectedDate:state.mapSelectedDate,mapSelectedHour:state.mapSelectedHour,
             showFavorites:state.showFavorites,mapView:state.mapView,csvUrl:state.csvUrl,
+            locationDetails:state.locationDetails,
             cyclesCompleted:allLocations().length
           }));
         } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
       }
       function setDiagnostic(message) { el('diagnostic').textContent=message; }
+      GpsCards.init({getMeta:(k)=>state.locationDetails[k]||{},setMeta:(k,v)=>{state.locationDetails[k]=v;store();renderRecords();renderFavorites();}});
       function appendLocation(p) {
         const loc = normalize(p), dk = dateKey(loc.timestamp), hk = hourKey(loc.timestamp);
         if (!state.days[dk]) state.days[dk]={date:dk,hours:{}};
@@ -268,6 +273,7 @@
         el('autoStartToggle').checked=state.autoStart;
         el('countdown').textContent=state.isRunning?formatCountdown(nextCaptureAt-Date.now()):'--:--';
         const loc=el('lastLocation');
+        el('lastFichaBtn').disabled=!state.lastLocation;
         loc.replaceChildren();
         if (!state.lastLocation) {loc.textContent='Sin posición disponible todavía.';return;}
         const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=formatCoords(state.lastLocation);
@@ -315,13 +321,15 @@
           return true;
         } catch(e) {el('mapMessage').textContent='No se pudo crear el mapa: '+readableError(e);return false;}
       }
-      function markerPopup(p,label) {
+      function markerPopup(p,label,kind='registro') {
         const wrapper=document.createElement('div');
         const title=document.createElement('strong');title.textContent=label;
         const coords=document.createElement('div');coords.textContent=formatCoords(p);
         const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
         const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
-        wrapper.append(title,document.createElement('br'),coords,time,link);
+        const ficha=document.createElement('button');ficha.type='button';ficha.textContent='Ver ficha y compartir';ficha.className='mini';
+        ficha.style.marginTop='8px';ficha.addEventListener('click',()=>GpsCards.open(p,kind));
+        wrapper.append(title,document.createElement('br'),coords,time,link,document.createElement('br'),ficha);
         return wrapper;
       }
       function renderMap(forceFit=false) {
@@ -349,7 +357,7 @@
         });
         if(state.showFavorites) {
           state.favorites.filter(valid).forEach((f)=>{
-            L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'))).addTo(overlays);
+            L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'),'favorito')).addTo(overlays);
             secondaryBounds.push([f.latitude,f.longitude]);
           });
         }
@@ -376,12 +384,13 @@
       function recordRow(p,withFavorite=true) {
         const row=document.createElement('div');row.className='record';
         const info=document.createElement('div');info.className='record-main';
-        const t=document.createElement('strong');t.textContent=fmtTime(p.timestamp);
+        const t=document.createElement('strong');const cardMeta=state.locationDetails[GpsCards.key(p)]||{};t.textContent=(cardMeta.name?cardMeta.name+' · ':'')+fmtTime(p.timestamp);
         const c=document.createElement('small');c.textContent=formatCoords(p)+(Number.isFinite(p.accuracy)?' · ±'+Math.round(p.accuracy)+' m':'');
         info.append(t,c);
         const actions=document.createElement('div');actions.className='record-actions';
         actions.append(btn('Ver mapa',()=>{el('dateSelector').value=dateKey(p.timestamp);state.mapSelectedDate=dateKey(p.timestamp);renderFilters();el('hourSelector').value=hourKey(p.timestamp);state.mapSelectedHour=hourKey(p.timestamp);store();renderMap(true);el('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});}));
         actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
+        actions.append(btn('Ficha / compartir',()=>GpsCards.open(p,'registro')));
         if(withFavorite) actions.append(btn('★ Favorito',()=>{state.favorites.push(Object.assign({},p,{label:fmtTime(p.timestamp)}));store();renderAll();}));
         actions.append(btn('Eliminar',()=>{deleteLocation(p);},true));
         row.append(info,actions);return row;
@@ -423,11 +432,12 @@
         favs.forEach((p)=>{
           const row=document.createElement('div');row.className='record';
           const info=document.createElement('div');info.className='record-main';
-          const title=document.createElement('strong');title.textContent=p.label||fmtTime(p.timestamp);
+          const title=document.createElement('strong');const cardMeta=state.locationDetails[GpsCards.key(p)]||{};title.textContent=cardMeta.name||p.label||fmtTime(p.timestamp);
           const details=document.createElement('small');details.textContent=formatCoords(p)+' · '+fmtTime(p.timestamp);
           info.append(title,details);
           const actions=document.createElement('div');actions.className='record-actions';
           actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
+          actions.append(btn('Ficha / compartir',()=>GpsCards.open(p,'favorito')));
           actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);store();renderAll();}},true));
           row.append(info,actions);root.append(row);
         });
@@ -493,17 +503,24 @@
         const data=isJson?JSON.parse(text):null;
         const items=isJson?itemsFromJson(text):itemsFromCsv(text);
         const count=mergeLocations(items);
+        let detailsAdded=0;
+        if(data&&data.locationDetails&&typeof data.locationDetails==='object'&&!Array.isArray(data.locationDetails)){
+          for(const [key,value] of Object.entries(data.locationDetails)){
+            if(!/^\d+\|-?\d{1,3}\.\d{6}\|-?\d{1,3}\.\d{6}$/.test(key)||!value||typeof value!=='object')continue;
+            if(!state.locationDetails[key]){state.locationDetails[key]={name:String(value.name||'').slice(0,90),contactName:String(value.contactName||'').slice(0,90),contactPhone:String(value.contactPhone||'').slice(0,30),address:String(value.address||'').slice(0,180),notes:String(value.notes||'').slice(0,600)};detailsAdded++;}
+          }
+        }
         let favoritesAdded=0;
         if(data && Array.isArray(data.favorites)){
           const known=new Set(state.favorites.map((p)=>[p.timestamp,p.latitude,p.longitude].join('|')));
           data.favorites.forEach((f)=>{if(!valid(f))return;const p=Object.assign(normalize(f),{label:String(f.label||'')});const key=[p.timestamp,p.latitude,p.longitude].join('|');if(!known.has(key)){known.add(key);state.favorites.push(p);favoritesAdded++;}});
-          if(favoritesAdded){store();renderAll(true);}
+          if(favoritesAdded||detailsAdded){store();renderAll(true);}
         }
-        const message='Importación: '+count+' registros nuevos de '+items.length+' válidos y '+favoritesAdded+' favoritos.';
+        const message='Importación: '+count+' registros nuevos, '+favoritesAdded+' favoritos y '+detailsAdded+' fichas con datos adicionales.';
         el('importStatus').textContent=message;setDiagnostic(message);
       }
       function exportData() {
-        const json=JSON.stringify({version:2,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites},null,2);
+        const json=JSON.stringify({version:3,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,locationDetails:state.locationDetails},null,2);
         const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
         const a=document.createElement('a');a.href=url;a.download='control-gps-'+dateKey(Date.now())+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }
@@ -514,6 +531,7 @@
       el('toggleBtn').addEventListener('click',()=>state.isRunning?stopTracking():startTracking());
       el('captureBtn').addEventListener('click',()=>capture('history'));
       el('favoriteBtn').addEventListener('click',()=>capture('favorite'));
+      el('lastFichaBtn').addEventListener('click',()=>{if(state.lastLocation)GpsCards.open(state.lastLocation,'registro');});
       el('centerBtn').addEventListener('click',()=>renderMap(true));
       el('dateSelector').addEventListener('change',(e)=>{state.mapSelectedDate=e.target.value;state.mapSelectedHour='all';renderFilters();store();renderMap(true);});
       el('hourSelector').addEventListener('change',(e)=>{state.mapSelectedHour=e.target.value;store();renderMap(true);});
@@ -550,7 +568,7 @@
       });
       el('clearBtn').addEventListener('click',()=>{
         if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
-        state.days={};state.favorites=[];state.lastLocation=null;state.mapSelectedDate='all';state.mapSelectedHour='all';
+        state.days={};state.favorites=[];state.lastLocation=null;state.locationDetails={};state.mapSelectedDate='all';state.mapSelectedHour='all';
         store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();if(!document.hidden&&map)map.invalidateSize();});
