@@ -7,10 +7,9 @@
   <meta name="description" content="Panel de control y visualización de recorridos GPS.">
   <title>Control GPS | Seguimiento y mapa</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="fichas-gps.css?v=20261027-2">
   <style>
     :root{color-scheme:light;--bg:#edf3f7;--panel:#fff;--ink:#192f42;--muted:#607489;--line:#d9e4ed;--brand:#086e9e;--brand2:#064f76;--positive:#147d54;--negative:#b54343;--gold:#a66811;--shadow:0 10px 32px rgba(26,55,76,.07)}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:var(--brand)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:var(--brand)}
     body.dark-mode{color-scheme:dark;--bg:#101d28;--panel:#182c3a;--ink:#eaf4fc;--muted:#a9bfce;--line:#354e60;--brand:#68c5f1;--brand2:#2b8bb5;--positive:#73dba2;--negative:#ff9b9b;--gold:#e9c27b;--shadow:0 10px 32px rgba(0,0,0,.18)}
     .top{background:linear-gradient(115deg,#064969,#0b80aa);color:#fff;padding:22px clamp(16px,4vw,48px);display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .top h1{font-size:clamp(23px,3vw,32px);margin:0 0 3px;font-weight:800}.top p{margin:0;color:#d2edf7;font-size:13px}.live-badge{border:1px solid #ffffff69;border-radius:999px;padding:9px 14px;font-weight:700;font-size:13px;background:#ffffff1b}
@@ -29,7 +28,8 @@
     .lower{grid-column:1/-1;overflow:hidden}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:11px 16px 0;overflow:auto}.tab{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);padding:12px 17px;font-weight:750;white-space:nowrap}.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
     .tab-panel{padding:20px;max-height:560px;overflow:auto}.tab-panel[hidden]{display:none}.empty{color:var(--muted);text-align:center;padding:28px}.group{margin-bottom:10px;border:1px solid var(--line);border-radius:11px;overflow:hidden}.group>summary{padding:12px 15px;font-weight:750;cursor:pointer;background:var(--bg)}.subgroup{margin:10px 13px;border:1px solid var(--line);border-radius:9px;overflow:hidden}.subgroup>summary{padding:10px 12px;font-weight:700;cursor:pointer;color:var(--muted)}
     .record{padding:12px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.record-main{min-width:0;overflow-wrap:anywhere}.record-main strong{display:block;font-size:14px}.record-main small{display:block;color:var(--muted);font-size:12px;margin-top:4px}.record-actions{display:flex;gap:6px;flex-wrap:wrap}.mini{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12px;font-weight:700}.mini.danger{color:var(--negative)}
-    .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px}.setting-box{background:var(--bg);border:1px solid var(--line);padding:17px;border-radius:12px}.setting-box h3{font-size:14px;margin:0 0 9px}.setting-box p{font-size:12px;color:var(--muted);line-height:1.5;margin:7px 0 13px}.setting-box input[type=number],.setting-box input[type=url],.setting-box input[type=file]{width:100%;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:var(--panel);padding:10px;min-width:0}.setting-box .btn{margin-top:8px;width:100%}.hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:13px}.foot{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 22px}
+    .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px}.setting-box{background:var(--bg);border:1px solid var(--line);padding:17px;border-radius:12px}.setting-box h3{font-size:14px;margin:0 0 9px}.setting-box p{font-size:12px;color:var(--muted);line-height:1.5;margin:7px 0 13px}.setting-box input[type=number],.setting-box input[type=url],.setting-box input[type=file],.setting-box input[type=password]{width:100%;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:var(--panel);padding:10px;min-width:0}.setting-box .btn{margin-top:8px;width:100%}.hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:13px}.foot{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 22px}
+    .measurement{margin:8px 0 0;padding:9px 11px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:12px;line-height:1.5;color:var(--muted)}.record .distance{font-size:12px;color:var(--positive);font-weight:750}.address-text{max-width:100%;overflow-wrap:anywhere}.section-actions{display:flex;gap:8px;flex-wrap:wrap}.section-actions .btn{flex:1;min-width:140px}.mini:focus-visible,.btn:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
     @media(max-width:900px){.shell{grid-template-columns:1fr}.control{display:grid;grid-template-columns:1fr 1fr;gap:14px}.control .wide{grid-column:1/-1}.map-panel{min-height:540px}}@media(max-width:560px){.shell{padding:11px;gap:11px}.control{display:flex;padding:17px}.map-panel{min-height:510px}.map-toolbar{padding:15px 15px 10px}.filters{padding:0 15px 12px}.field{flex:1;min-width:110px}.map-wrap{min-height:320px}.tab-panel{padding:12px}.record{align-items:flex-start}.metrics{gap:8px}.map-footer{padding:10px 15px}}
   </style>
 </head>
@@ -46,11 +46,12 @@
         <div class="metric"><div class="metric-label">Registros guardados</div><div class="metric-value" id="totalCount">0</div></div>
         <div class="metric"><div class="metric-label">Intervalo</div><div class="metric-value" id="intervalText">5 min</div></div>
       </div>
-      <div class="last-position wide"><strong>Última posición conocida</strong><div id="lastLocation">Sin posición disponible todavía.</div><button type="button" class="btn" id="lastFichaBtn" style="margin-top:10px" disabled>Ver ficha de última ubicación</button></div>
+      <div class="last-position wide"><strong>Última posición conocida</strong><div id="lastLocation">Sin posición disponible todavía.</div><div class="measurement" id="distanceStatus" role="status" aria-live="polite">Sin referencia actual. Usa «Medir desde aquí» para obtener distancias reales desde tu posición.</div></div>
       <div class="actions wide">
         <button class="btn btn-primary btn-wide" id="toggleBtn" type="button">Iniciar seguimiento</button>
         <button class="btn" id="captureBtn" type="button">Registrar ubicación</button>
         <button class="btn" id="favoriteBtn" type="button">Añadir favorito</button>
+        <button class="btn btn-wide" id="measureBtn" type="button">Medir desde mi ubicación</button>
       </div>
       <div class="feedback wide" id="diagnostic" role="status" aria-live="polite">El mapa puede verse aunque no existan registros. Para registrar posiciones, permite el acceso a ubicación.</div>
     </aside>
@@ -76,14 +77,17 @@
         <button class="tab" data-tab="favorites" type="button">Favoritos</button>
         <button class="tab" data-tab="settings" type="button">Opciones y datos</button>
       </nav>
-      <div id="records" class="tab-panel"></div>
-      <div id="favorites" class="tab-panel" hidden></div>
+      <div id="records" class="tab-panel"><div class="section-actions"><button class="btn" id="copyAllBtn" type="button">Copiar todos los datos</button><button class="btn" id="shareAllBtn" type="button">Compartir todos los datos</button></div><div id="recordsList"></div></div>
+      <div id="favorites" class="tab-panel" hidden><div id="favoritesList"></div></div>
       <div id="settings" class="tab-panel" hidden>
         <div class="settings">
           <div class="setting-box">
             <h3>Intervalo de registro</h3><p>La frecuencia predeterminada es de 5 minutos. El navegador debe permitir el GPS.</p>
             <label class="field" for="cycleDurationInput">Segundos <input id="cycleDurationInput" type="number" min="30" max="86400" step="30" value="300"></label>
             <label class="toggle-row"><input id="autoStartToggle" type="checkbox" checked> Reanudar seguimiento al abrir</label>
+          </div>
+          <div class="setting-box">
+            <h3>Precisión mínima aceptable</h3><p>Define el margen de error máximo del GPS. Si la precisión del dispositivo es peor que este valor, el punto no se guarda. Un número menor exige mayor precisión.</p><label class="field" for="accuracyLimitInput">Error máximo (metros) <input id="accuracyLimitInput" type="number" min="5" max="5000" step="5" value="100"></label>
           </div>
           <div class="setting-box">
             <h3>Presentación</h3><label class="toggle-row"><input id="darkModeToggle" type="checkbox"> Tema oscuro</label>
@@ -103,6 +107,9 @@
             <button class="btn" id="syncCsvBtn" type="button">Importar CSV de la URL</button>
           </div>
           <div class="setting-box">
+            <h3>Direcciones postales (opcional)</h3><p>Sin fichas. Puedes escribir la dirección completa de cada punto o buscar una dirección aproximada con una clave propia de Geoapify, solicitada únicamente cuando pulses «Buscar dirección». Las coordenadas se envían al proveedor solo si lo autorizas.</p><label class="field" for="geoapifyKeyInput">Clave Geoapify (opcional)<input id="geoapifyKeyInput" type="password" autocomplete="off" placeholder="Clave restringida al dominio de la aplicación"></label><p>La clave se conserva solo en este navegador, no se exporta ni se incorpora a los mensajes compartidos. En aplicaciones web la clave es visible y debes restringirla por origen o referente en Geoapify.</p><button class="btn" id="saveGeoapifyBtn" type="button">Guardar configuración local</button><p>Geoapify devuelve direcciones aproximadas cuando existen; pueden faltar calles o números. Para una dirección exacta, introdúcela manualmente.</p>
+          </div>
+          <div class="setting-box">
             <h3>Eliminar información local</h3><p>Borra los registros y favoritos de este navegador. No modifica datos remotos ni permite recuperarlos sin una copia.</p>
             <button class="btn btn-danger" id="clearBtn" type="button">Borrar registros y favoritos</button>
           </div>
@@ -113,7 +120,6 @@
   </main>
   <footer class="foot">Control GPS · Mapas de © OpenStreetMap · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="fichas-gps.js?v=20261027-2"></script>
   <script>
     (function () {
       'use strict';
@@ -138,11 +144,22 @@
         mapSelectedDate: saved.mapSelectedDate || 'all',
         mapSelectedHour: saved.mapSelectedHour || 'all',
         showFavorites: saved.showFavorites !== false,
-        locationDetails: saved.locationDetails && typeof saved.locationDetails === 'object' && !Array.isArray(saved.locationDetails) ? saved.locationDetails : {},
+        accuracyLimit: Number.isFinite(num(saved.accuracyLimit)) && num(saved.accuracyLimit)>=5 && num(saved.accuracyLimit)<=5000 ? num(saved.accuracyLimit) : 100,
+        addresses: saved.addresses && typeof saved.addresses==='object' && !Array.isArray(saved.addresses) ? saved.addresses : {},
+        geoapifyKey: typeof saved.geoapifyKey==='string' ? saved.geoapifyKey : '',
+        legacyDetails: saved.locationDetails && typeof saved.locationDetails==='object' ? saved.locationDetails : null,
+        currentFix: null, selectedMeasure: null,
         mapView: saved.mapView || null,
         csvUrl: saved.csvUrl || '',
         isRunning: false
       };
+      // Conservar las direcciones escritas en versiones anteriores al retirar las fichas.
+      if(state.legacyDetails){for(const [oldKey,value] of Object.entries(state.legacyDetails)){
+        const parts=oldKey.split('|');if(parts.length!==3||!value||typeof value.address!=='string'||!value.address.trim())continue;
+        const lat=Number(parts[1]),lng=Number(parts[2]);if(!Number.isFinite(lat)||Math.abs(lat)>90||!Number.isFinite(lng)||Math.abs(lng)>180)continue;
+        const k=lat.toFixed(6)+','+lng.toFixed(6);
+        if(!state.addresses[k])state.addresses[k]={address:value.address.trim().slice(0,250),source:'manual (migrada)'};
+      }}
       let map = null, overlays = null, nextCaptureAt = 0, ticker = null, captureBusy = false, mapSaveTimeout = null, lastFitKey = '';
       function allLocations() {
         const result = [];
@@ -165,13 +182,13 @@
             cycleDuration:state.cycleDuration,autoStart:state.autoStart,darkMode:state.darkMode,
             mapSelectedDate:state.mapSelectedDate,mapSelectedHour:state.mapSelectedHour,
             showFavorites:state.showFavorites,mapView:state.mapView,csvUrl:state.csvUrl,
-            locationDetails:state.locationDetails,
+            accuracyLimit:state.accuracyLimit,addresses:state.addresses,geoapifyKey:state.geoapifyKey,
+            ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}),
             cyclesCompleted:allLocations().length
           }));
         } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
       }
       function setDiagnostic(message) { el('diagnostic').textContent=message; }
-      window.GpsCards.init({getMeta:(k)=>state.locationDetails[k]||{},setMeta:(k,v)=>{state.locationDetails[k]=v;store();renderRecords();renderFavorites();}});
       function appendLocation(p) {
         const loc = normalize(p), dk = dateKey(loc.timestamp), hk = hourKey(loc.timestamp);
         if (!state.days[dk]) state.days[dk]={date:dk,hours:{}};
@@ -181,14 +198,16 @@
       }
       function mergeLocations(items) {
         const keys = new Set(allLocations().map((p) => [p.timestamp,p.latitude,p.longitude].join('|')));
-        let added=0;
+        let added=0,addressAdded=0;
         for (const input of items) {
           if (!valid(input)) continue;
           const loc=normalize(input), key=[loc.timestamp,loc.latitude,loc.longitude].join('|');
+          const rawAddress=typeof input.address==='string'?input.address.trim().slice(0,250):'';
+          if(rawAddress){const ak=addressKey(loc);if(!state.addresses[ak]){state.addresses[ak]={address:rawAddress,source:'importada'};addressAdded++;}}
           if (keys.has(key)) continue;
           keys.add(key);appendLocation(loc);added++;
         }
-        if (added) { store();renderAll(true); }
+        if (added||addressAdded) { store();renderAll(true); }
         return added;
       }
       function readableError(e) {
@@ -220,6 +239,12 @@
           const pos=await acquirePosition();
           const p={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy,timestamp:pos.timestamp || Date.now()};
           if (!valid(p)) throw new Error('El GPS devolvió coordenadas inválidas.');
+          const accuracy=Number(p.accuracy);
+          if(!Number.isFinite(accuracy)||accuracy<0||accuracy>state.accuracyLimit){
+            setDiagnostic('GPS con precisión insuficiente: '+(Number.isFinite(accuracy)?'±'+Math.round(accuracy)+' m':'desconocida')+'. Se exige ±'+state.accuracyLimit+' m o mejor. No se guardó este punto; ajusta el límite en Opciones y datos si lo necesitas.');
+            return;
+          }
+          state.currentFix=normalize(p);
           state.lastLocation=normalize(p);
           if (kind==='favorite') {
             state.favorites.push(Object.assign({},normalize(p),{label:fmtTime(p.timestamp)}));
@@ -273,10 +298,11 @@
         el('autoStartToggle').checked=state.autoStart;
         el('countdown').textContent=state.isRunning?formatCountdown(nextCaptureAt-Date.now()):'--:--';
         const loc=el('lastLocation');
-        el('lastFichaBtn').disabled=!state.lastLocation;
+        const measurement=el('distanceStatus');
+        measurement.textContent=state.currentFix?'Referencia de distancia: GPS actual · ±'+Math.round(state.currentFix.accuracy)+' m · '+fmtTime(state.currentFix.timestamp)+(state.selectedMeasure?' · Destino: '+distanceLabel(state.currentFix,state.selectedMeasure):' · distancias indicadas junto a cada registro'):'Sin referencia actual. Pulsa «Medir desde mi ubicación» para obtener distancias.';
         loc.replaceChildren();
         if (!state.lastLocation) {loc.textContent='Sin posición disponible todavía.';return;}
-        const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=formatCoords(state.lastLocation);
+        const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=addressOf(state.lastLocation)||formatCoords(state.lastLocation);
         loc.append(link,document.createElement('br'),document.createTextNode(fmtTime(state.lastLocation.timestamp)));
       }
       function fillSelect(select,choices,wanted) {
@@ -321,23 +347,19 @@
           return true;
         } catch(e) {el('mapMessage').textContent='No se pudo crear el mapa: '+readableError(e);return false;}
       }
-      function markerPopup(p,label,kind='registro') {
+      function markerPopup(p,label) {
         const wrapper=document.createElement('div');
-        const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};
-        const title=document.createElement('strong');title.textContent=cardMeta.name||label;
+        const title=document.createElement('strong');title.textContent=label;
         const coords=document.createElement('div');coords.textContent=formatCoords(p);
         const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
-        const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
-        const ficha=document.createElement('button');ficha.type='button';ficha.textContent='Ver ficha y compartir';ficha.className='mini';
-        ficha.style.marginTop='8px';ficha.addEventListener('click',()=>window.GpsCards.open(p,kind));
-        wrapper.append(title,document.createElement('br'),coords,time,link);
-        if(cardMeta.contactName||cardMeta.contactPhone){
-          const contact=document.createElement('div');contact.textContent='Contacto: '+(cardMeta.contactName||'Sin nombre');wrapper.append(contact);
-          const number=String(cardMeta.contactPhone||'').trim();if(/^\+?[\d ()-]{7,26}$/.test(number)){
-            const call=document.createElement('a');call.href='tel:'+number.replace(/[^+\d]/g,'');call.textContent='Llamar: '+number;wrapper.append(call);
-          }
-        }
-        wrapper.append(document.createElement('br'),ficha);
+        const link=document.createElement('a');link.href=mapLink(p);link.textContent=addressOf(p)||'Abrir coordenadas en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
+        const addr=addressOf(p);
+        if(state.currentFix){const distance=document.createElement('div');distance.textContent='Desde tu ubicación: '+distanceLabel(state.currentFix,p)+' en línea recta';wrapper.append(distance);}
+        const copy=btn('Copiar datos',()=>copyLocation(p));const share=btn('Compartir',()=>shareLocation(p));
+        const measure=btn('Medir distancia',()=>measureFromHere(p));
+        wrapper.append(title,document.createElement('br'),coords,time);
+        if(addr){const address=document.createElement('div');address.textContent='Dirección: '+addr;wrapper.append(address);}
+        wrapper.append(link,document.createElement('br'),copy,share,measure);
         return wrapper;
       }
       function renderMap(forceFit=false) {
@@ -365,9 +387,15 @@
         });
         if(state.showFavorites) {
           state.favorites.filter(valid).forEach((f)=>{
-            L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'),'favorito')).addTo(overlays);
+            L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'))).addTo(overlays);
             secondaryBounds.push([f.latitude,f.longitude]);
           });
+        }
+        if(state.currentFix && valid(state.currentFix)){
+          L.circleMarker([state.currentFix.latitude,state.currentFix.longitude],{radius:11,color:'#fff',weight:3,fillColor:'#04b6b0',fillOpacity:1}).bindPopup('Tu ubicación actual de referencia').addTo(overlays);
+        }
+        if(state.currentFix && state.selectedMeasure && valid(state.selectedMeasure)){
+          L.polyline([[state.currentFix.latitude,state.currentFix.longitude],[state.selectedMeasure.latitude,state.selectedMeasure.longitude]],{color:'#0fafa7',weight:3,opacity:.95,dashArray:'8,7'}).addTo(overlays);
         }
         if(valid(state.lastLocation)) {
           const p=state.lastLocation;
@@ -386,19 +414,120 @@
         lastFitKey=fitKey;
         setTimeout(()=>{if(map)map.invalidateSize();},60);
       }
+
+      // Distancia geodésica aproximada en línea recta. No es distancia por carretera.
+      function haversine(a,b){
+        const r=Math.PI/180,lat1=a.latitude*r,lat2=b.latitude*r,dl=(b.latitude-a.latitude)*r,dn=(b.longitude-a.longitude)*r;
+        const h=Math.sin(dl/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dn/2)**2;
+        return 6371000*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h)));
+      }
+      function distanceLabel(a,b){const d=haversine(a,b);return d<1000?Math.round(d).toLocaleString('es-CO')+' m':(d/1000).toLocaleString('es-CO',{maximumFractionDigits:2})+' km';}
+      // Las direcciones son manuales o resultados aproximados guardados por coordenadas.
+      function addressKey(p){return Number(p.latitude).toFixed(6)+','+Number(p.longitude).toFixed(6);}
+      function addressOf(p){const d=state.addresses[addressKey(p)];return d&&typeof d.address==='string'?d.address.trim():'';}
+      function addressInfo(p){const d=state.addresses[addressKey(p)];return d&&typeof d.address==='string'?d:null;}
+      function editAddress(p){
+        const value=window.prompt('Dirección postal completa de este punto (se guardará solo en tu navegador). Deja vacío para quitarla:',addressOf(p));
+        if(value===null)return;
+        const v=value.trim().slice(0,250),k=addressKey(p);
+        if(v)state.addresses[k]={address:v,source:'manual'};
+        else delete state.addresses[k];
+        store();renderAll();setDiagnostic(v?'Dirección guardada: '+v:'Dirección manual eliminada.');
+      }
+      async function lookupAddress(p){
+        if(!state.geoapifyKey){setDiagnostic('Configura antes tu propia clave Geoapify en Opciones y datos o usa Dirección para introducirla manualmente.');return;}
+        const k=addressKey(p),button=el('saveGeoapifyBtn');
+        button.disabled=true;setDiagnostic('Consultando dirección aproximada de las coordenadas…');
+        try{
+          const url='https://api.geoapify.com/v1/geocode/reverse?lat='+encodeURIComponent(p.latitude)+'&lon='+encodeURIComponent(p.longitude)+'&lang=es&format=geojson&apiKey='+encodeURIComponent(state.geoapifyKey);
+          const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+          let res;try{res=await fetch(url,{signal:controller.signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});}finally{clearTimeout(timeout);}
+          if(!res.ok)throw Error('No se pudo consultar el proveedor (HTTP '+res.status+'). Comprueba la clave y sus restricciones.');
+          const info=await res.json(),prop=info&&info.features&&info.features[0]&&info.features[0].properties;
+          const address=prop&&String(prop.formatted||'').trim().slice(0,250);
+          if(!address)throw Error('No se encontró una dirección para estas coordenadas. Puedes escribir una manual.');
+          state.addresses[k]={address,source:'Geoapify (aproximada)'};
+          store();renderAll();setDiagnostic('Dirección aproximada encontrada: '+address+'. Verifica número y calle antes de compartir.');
+        }catch(err){setDiagnostic('Dirección no disponible: '+err.message);}
+        finally{button.disabled=false;}
+      }
+      async function measureFromHere(target=null){
+        const b=el('measureBtn');b.disabled=true;b.textContent='Midiendo ubicación…';setDiagnostic('Obteniendo ubicación actual para calcular distancias en línea recta…');
+        try{
+          const pos=await acquirePosition();
+          const p={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy,timestamp:pos.timestamp||Date.now()};
+          if(!valid(p))throw Error('El GPS no devolvió coordenadas válidas.');
+          if(!Number.isFinite(p.accuracy)||p.accuracy<0||p.accuracy>state.accuracyLimit)throw Error('Precisión insuficiente: '+(Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'no indicada')+'. Configurado: ±'+state.accuracyLimit+' m como máximo.');
+          state.currentFix=normalize(p);state.selectedMeasure=target;
+          renderAll();
+          if(target&&map){const corners=[[p.latitude,p.longitude],[target.latitude,target.longitude]];
+            if(haversine(p,target)<5)map.setView(corners[0],17);
+            else map.fitBounds(corners,{padding:[45,45],maxZoom:16});}
+          setDiagnostic(target?'Distancia en línea recta: '+distanceLabel(p,target)+' (GPS actual ±'+Math.round(p.accuracy)+' m).':'Distancias calculadas desde la posición actual. GPS ±'+Math.round(p.accuracy)+' m.');
+        }catch(err){setDiagnostic('No se pudo medir: '+readableError(err));}
+        finally{b.disabled=false;b.textContent='Medir desde mi ubicación';}
+      }
+      function labelFor(p){const found=state.favorites.find(f=>valid(f)&&Number(f.timestamp)===Number(p.timestamp)&&addressKey(f)===addressKey(p));return found&&found.label?'Favorito: '+found.label:'Registro GPS';}
+      function dataFor(p){
+        const record=['CONTROL GPS — '+labelFor(p),'Fecha y hora: '+fmtTime(p.timestamp),'Coordenadas GPS: '+formatCoords(p)];
+        record.push('Precisión del registro: '+(Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'No informada'));
+        const meta=addressInfo(p);
+        record.push('Dirección postal: '+(meta?meta.address:'No disponible; consulta o ingresa la dirección completa.'));
+        if(meta&&meta.source&&meta.source!=='manual')record.push('Origen de dirección: '+meta.source+' (verificar antes de usar)');
+        if(state.currentFix)record.push('Distancia desde tu ubicación de referencia: '+distanceLabel(state.currentFix,p)+' en línea recta');
+        record.push('Ver ubicación en Google Maps: '+mapLink(p));
+        record.push('Cómo llegar: https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(formatCoords(p)));
+        return record.join('\n');
+      }
+      const htmlEscape=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      function htmlFor(p){
+        const text=dataFor(p).split('\n');
+        const address=addressOf(p)||'Ubicación en coordenadas '+formatCoords(p);
+        const link='<a href="'+htmlEscape(mapLink(p))+'">'+htmlEscape(address)+'</a>';
+        return '<div style="font:14px/1.6 system-ui,sans-serif">'+text.filter(t=>!t.startsWith('Ver ubicación en Google Maps:')).map(t=>'<div>'+htmlEscape(t)+'</div>').join('')+'<div>Ver en Google Maps (dirección): '+link+'</div></div>';
+      }
+      async function copyText(text,html){
+        if(navigator.clipboard&&navigator.clipboard.write&&typeof ClipboardItem==='function'&&html){
+          try{await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([text],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);return;}catch{}
+        }
+        if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);return;}
+        const area=document.createElement('textarea');area.value=text;document.body.append(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw Error('No se puede copiar en este navegador.');
+      }
+      async function copyLocation(p){try{await copyText(dataFor(p),htmlFor(p));setDiagnostic('Información copiada. En editores con formato, la dirección es un enlace clicable; en WhatsApp la URL se vuelve pulsable.');}catch(err){setDiagnostic('Error al copiar: '+err.message);}}
+      async function shareLocation(p){
+        const text=dataFor(p);
+        try{if(navigator.share){await navigator.share({title:'Ubicación GPS',text});setDiagnostic('Datos enviados al menú de compartir.');}else{await copyLocation(p);}}
+        catch(err){if(err.name!=='AbortError')setDiagnostic('Error al compartir: '+err.message);}
+      }
+      function allData(){const a=allLocations(),fav=state.favorites.filter(valid);return ['CONTROL GPS · DATOS COMPARTIDOS','Registros: '+a.length+' · Favoritos: '+fav.length,'','REGISTROS',...a.map((p,i)=>'\n#'+(i+1)+'\n'+dataFor(p)),'','FAVORITOS',...fav.map((p,i)=>'\n★ '+(i+1)+'\n'+dataFor(p))].join('\n');}
+      function htmlAll(){const records=allLocations(),favorites=state.favorites.filter(valid);return '<div style="font:14px/1.6 system-ui,sans-serif"><strong>CONTROL GPS · DATOS COMPARTIDOS</strong><h3>Registros</h3>'+records.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'<h3>Favoritos</h3>'+favorites.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'</div>';}
+      async function copyAll(){try{await copyText(allData(),htmlAll());setDiagnostic('Todos los registros y favoritos copiados con sus enlaces de Google Maps. Solo se incluyen direcciones ya guardadas.');}catch(err){setDiagnostic('Error al copiar todo: '+err.message);}}
+      async function shareAll(){
+        const content=allData();
+        try{if(navigator.share){await navigator.share({title:'Historial Control GPS',text:content});setDiagnostic('Historial enviado al menú de compartir.');}
+          else await copyAll();}
+        catch(err){if(err.name!=='AbortError')setDiagnostic('No se pudo compartir el historial: '+err.message+'; prueba Copiar todos los datos.');}
+      }
+
       function btn(text,action,danger=false) {
         const b=document.createElement('button');b.type='button';b.textContent=text;b.className='mini'+(danger?' danger':'');b.addEventListener('click',action);return b;
       }
       function recordRow(p,withFavorite=true) {
         const row=document.createElement('div');row.className='record';
         const info=document.createElement('div');info.className='record-main';
-        const t=document.createElement('strong');const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};t.textContent=(cardMeta.name?cardMeta.name+' · ':'')+fmtTime(p.timestamp);
+        const t=document.createElement('strong');t.textContent=fmtTime(p.timestamp);
         const c=document.createElement('small');c.textContent=formatCoords(p)+(Number.isFinite(p.accuracy)?' · ±'+Math.round(p.accuracy)+' m':'');
         info.append(t,c);
+        const address=addressOf(p);if(address){const d=document.createElement('small');d.className='address-text';d.textContent='Dirección: '+address;info.append(d);}
+        if(state.currentFix){const distance=document.createElement('small');distance.className='distance';distance.textContent='Desde tu ubicación: '+distanceLabel(state.currentFix,p)+' (línea recta)';info.append(distance);}
         const actions=document.createElement('div');actions.className='record-actions';
         actions.append(btn('Ver mapa',()=>{el('dateSelector').value=dateKey(p.timestamp);state.mapSelectedDate=dateKey(p.timestamp);renderFilters();el('hourSelector').value=hourKey(p.timestamp);state.mapSelectedHour=hourKey(p.timestamp);store();renderMap(true);el('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});}));
         actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
-        actions.append(btn('Ficha / compartir',()=>window.GpsCards.open(p,'registro')));
+        actions.append(btn('Medir',()=>measureFromHere(p)));
+        actions.append(btn('Dirección',()=>editAddress(p)));
+        actions.append(btn('Buscar dirección',()=>lookupAddress(p)));
+        actions.append(btn('Copiar',()=>copyLocation(p)));
+        actions.append(btn('Compartir',()=>shareLocation(p)));
         if(withFavorite) actions.append(btn('★ Favorito',()=>{state.favorites.push(Object.assign({},p,{label:fmtTime(p.timestamp)}));store();renderAll();}));
         actions.append(btn('Eliminar',()=>{deleteLocation(p);},true));
         row.append(info,actions);return row;
@@ -411,11 +540,10 @@
         bucket.locations.splice(i,1);
         if(!bucket.locations.length) delete state.days[dk].hours[hk];
         if(!Object.keys(state.days[dk].hours).length) delete state.days[dk];
-        if(!state.favorites.some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)) && !allLocations().some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)))delete state.locationDetails[window.GpsCards.key(p)];
         store();renderAll();
       }
       function renderRecords() {
-        const root=el('records');root.replaceChildren();
+        const root=el('recordsList');root.replaceChildren();
         const locations=allLocations().reverse();
         if(!locations.length) {const m=document.createElement('div');m.className='empty';m.textContent='Sin registros. Activa el seguimiento, registra una posición o importa un historial.';root.append(m);return;}
         const dates=[...new Set(locations.map((p)=>dateKey(p.timestamp)))];
@@ -435,19 +563,25 @@
         });
       }
       function renderFavorites() {
-        const root=el('favorites');root.replaceChildren();
+        const root=el('favoritesList');root.replaceChildren();
         const favs=[...state.favorites].filter(valid).sort((a,b)=>b.timestamp-a.timestamp);
         if(!favs.length) {const m=document.createElement('div');m.className='empty';m.textContent='Todavía no hay favoritos.';root.append(m);return;}
         favs.forEach((p)=>{
           const row=document.createElement('div');row.className='record';
           const info=document.createElement('div');info.className='record-main';
-          const title=document.createElement('strong');const cardMeta=state.locationDetails[window.GpsCards.key(p)]||{};title.textContent=cardMeta.name||p.label||fmtTime(p.timestamp);
+          const title=document.createElement('strong');title.textContent=p.label||fmtTime(p.timestamp);
           const details=document.createElement('small');details.textContent=formatCoords(p)+' · '+fmtTime(p.timestamp);
           info.append(title,details);
+          const address=addressOf(p);if(address){const d=document.createElement('small');d.textContent='Dirección: '+address;info.append(d);}
+          if(state.currentFix){const d=document.createElement('small');d.className='distance';d.textContent='Desde tu ubicación: '+distanceLabel(state.currentFix,p)+' (línea recta)';info.append(d);}
           const actions=document.createElement('div');actions.className='record-actions';
           actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
-          actions.append(btn('Ficha / compartir',()=>window.GpsCards.open(p,'favorito')));
-          actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);if(!state.favorites.some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p))&&!allLocations().some((f)=>window.GpsCards.key(f)===window.GpsCards.key(p)))delete state.locationDetails[window.GpsCards.key(p)];store();renderAll();}},true));
+          actions.append(btn('Medir',()=>measureFromHere(p)));
+          actions.append(btn('Dirección',()=>editAddress(p)));
+          actions.append(btn('Buscar dirección',()=>lookupAddress(p)));
+          actions.append(btn('Copiar',()=>copyLocation(p)));
+          actions.append(btn('Compartir',()=>shareLocation(p)));
+          actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);store();renderAll();}},true));
           row.append(info,actions);root.append(row);
         });
       }
@@ -493,7 +627,7 @@
           const numericTimestamp=Number(rawTimestamp);
           const timestamp=rawTimestamp?(Number.isFinite(numericTimestamp)&&numericTimestamp>0?(numericTimestamp<1e11?numericTimestamp*1000:numericTimestamp):Date.parse(rawTimestamp)):
             parseTimestamp(field(row,['fecha','date']),field(row,['hora','time']));
-          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null};
+          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null,address:field(row,['direccion','direccion completa','direccion aproximada','address','full address'])||''};
         }).filter(valid);
       }
       function itemsFromJson(text) {
@@ -512,24 +646,24 @@
         const data=isJson?JSON.parse(text):null;
         const items=isJson?itemsFromJson(text):itemsFromCsv(text);
         const count=mergeLocations(items);
-        let detailsAdded=0;
-        if(data&&data.locationDetails&&typeof data.locationDetails==='object'&&!Array.isArray(data.locationDetails)){
-          for(const [key,value] of Object.entries(data.locationDetails)){
-            if(!/^\d+\|-?\d{1,3}\.\d{6}\|-?\d{1,3}\.\d{6}$/.test(key)||!value||typeof value!=='object')continue;
-            if(!state.locationDetails[key]){state.locationDetails[key]={name:String(value.name||'').slice(0,90),contactName:String(value.contactName||'').slice(0,90),contactPhone:String(value.contactPhone||'').slice(0,30),address:String(value.address||'').slice(0,180),notes:String(value.notes||'').slice(0,600)};detailsAdded++;}
+        let addressesAdded=0;
+        if(data&&data.addresses&&typeof data.addresses==='object'&&!Array.isArray(data.addresses)){
+          for(const [k,v] of Object.entries(data.addresses)){if(!/^[-\d.,]+$/.test(k)||!v||typeof v!=='object'||typeof v.address!=='string')continue;
+            if(!state.addresses[k]&&v.address.trim()){state.addresses[k]={address:v.address.trim().slice(0,250),source:String(v.source||'importada').slice(0,30)};addressesAdded++;}
           }
+          if(addressesAdded){store();renderAll();}
         }
         let favoritesAdded=0;
         if(data && Array.isArray(data.favorites)){
           const known=new Set(state.favorites.map((p)=>[p.timestamp,p.latitude,p.longitude].join('|')));
           data.favorites.forEach((f)=>{if(!valid(f))return;const p=Object.assign(normalize(f),{label:String(f.label||'')});const key=[p.timestamp,p.latitude,p.longitude].join('|');if(!known.has(key)){known.add(key);state.favorites.push(p);favoritesAdded++;}});
-          if(favoritesAdded||detailsAdded){store();renderAll(true);}
+          if(favoritesAdded){store();renderAll(true);}
         }
-        const message='Importación: '+count+' registros nuevos, '+favoritesAdded+' favoritos y '+detailsAdded+' fichas con datos adicionales.';
+        const message='Importación: '+count+' registros, '+favoritesAdded+' favoritos y '+addressesAdded+' direcciones nuevas.';
         el('importStatus').textContent=message;setDiagnostic(message);
       }
       function exportData() {
-        const json=JSON.stringify({version:3,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,locationDetails:state.locationDetails},null,2);
+        const json=JSON.stringify({version:4,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,addresses:state.addresses,accuracyLimit:state.accuracyLimit,...(state.legacyDetails?{locationDetails:state.legacyDetails}:{})},null,2);
         const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
         const a=document.createElement('a');a.href=url;a.download='control-gps-'+dateKey(Date.now())+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }
@@ -540,7 +674,9 @@
       el('toggleBtn').addEventListener('click',()=>state.isRunning?stopTracking():startTracking());
       el('captureBtn').addEventListener('click',()=>capture('history'));
       el('favoriteBtn').addEventListener('click',()=>capture('favorite'));
-      el('lastFichaBtn').addEventListener('click',()=>{if(state.lastLocation)window.GpsCards.open(state.lastLocation,'registro');});
+      el('measureBtn').addEventListener('click',()=>measureFromHere());
+      el('copyAllBtn').addEventListener('click',()=>copyAll());
+      el('shareAllBtn').addEventListener('click',()=>shareAll());
       el('centerBtn').addEventListener('click',()=>renderMap(true));
       el('dateSelector').addEventListener('change',(e)=>{state.mapSelectedDate=e.target.value;state.mapSelectedHour='all';renderFilters();store();renderMap(true);});
       el('hourSelector').addEventListener('change',(e)=>{state.mapSelectedHour=e.target.value;store();renderMap(true);});
@@ -552,6 +688,10 @@
         state.cycleDuration=Math.round(v)*1000;if(state.isRunning)nextCaptureAt=Date.now()+state.cycleDuration;
         store();renderStatus();
       });
+      el('accuracyLimitInput').value=String(state.accuracyLimit);
+      el('accuracyLimitInput').addEventListener('change',(ev)=>{const value=Number(ev.target.value);if(!Number.isFinite(value)||value<5||value>5000){ev.target.value=String(state.accuracyLimit);setDiagnostic('El error GPS máximo debe estar entre 5 y 5.000 metros.');return;}state.accuracyLimit=value;store();setDiagnostic('Precisión mínima ajustada: solo se guardan posiciones con error de ±'+value+' m o menor.');});
+      el('geoapifyKeyInput').value=state.geoapifyKey;
+      el('saveGeoapifyBtn').addEventListener('click',()=>{state.geoapifyKey=el('geoapifyKeyInput').value.trim();store();setDiagnostic(state.geoapifyKey?'Clave de consulta postal guardada en este navegador.':'Consulta postal automática desactivada.');});
       el('autoStartToggle').addEventListener('change',(e)=>{if(e.target.checked){startTracking();}else{stopTracking();}});
       el('darkModeToggle').checked=state.darkMode;
       document.body.classList.toggle('dark-mode',state.darkMode);
@@ -577,7 +717,7 @@
       });
       el('clearBtn').addEventListener('click',()=>{
         if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
-        state.days={};state.favorites=[];state.lastLocation=null;state.locationDetails={};state.mapSelectedDate='all';state.mapSelectedHour='all';
+        state.days={};state.favorites=[];state.addresses={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;state.mapSelectedDate='all';state.mapSelectedHour='all';
         store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();if(!document.hidden&&map)map.invalidateSize();});

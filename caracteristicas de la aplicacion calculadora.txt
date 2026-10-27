@@ -18,3 +18,14 @@ NOTAS TÉCNICAS:
 - No se garantiza el seguimiento cuando el navegador suspende la pestaña o con pantalla apagada.
 - HTTPS/localhost, permisos de geolocalización y conexión a internet son necesarios para captura/mapas.
 - Para instrucciones detalladas, consultar README.md.
+
+ACTUALIZACIÓN DE ALCANCE – MEDICIÓN, PRECISIÓN Y COMPARTIR
+
+- Mantener la primera versión visual e interactiva de Control GPS, sin calculadora, contraseña ni fichas HTML/PNG.
+- Medir distancias en línea recta desde la ubicación actual obtenida por GPS, con precisión informada y línea de referencia.
+- Umbral configurable del máximo error GPS aceptable; rechazar capturas con precisión inferior al mínimo elegido.
+- Copiar/compartir datos de cada ubicación y del conjunto de registros/favoritos, con URL clicable de Maps, fecha/hora, precisión, distancia cuando se conoce y dirección postal escrita o consultada.
+- Texto visible del hipervínculo = dirección completa solo donde se admite portapapeles enriquecido. En WhatsApp: dirección y URL pulsable como texto plano.
+- Dirección postal no inferida sin geocodificación: edición manual, o consulta puntual aproximada vía Geoapify con clave propia protegida.
+- Conservar historial y preferencias originales sin borrar datos del navegador; incluir direcciones en JSON.
+- PENDIENTE: integración Apps Script/Sheets en etapa posterior desde Work.
