@@ -1,1862 +1,563 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Calculadora v1.0</title>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b6591">
+  <meta name="description" content="Panel de control y visualización de recorridos GPS.">
+  <title>Control GPS | Seguimiento y mapa</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background:#f5f5f5; color:#11181C;
-    }
-    body.dark-mode { background:#151718; color:#ECEDEE; }
-
-    .container { max-width:100%; height:100vh; display:flex; flex-direction:column; }
-    .header {
-      padding:20px;
-      background: linear-gradient(135deg, #0a7ea4 0%, #0a5a7a 100%);
-      color:white; text-align:center;
-      box-shadow:0 2px 8px rgba(0,0,0,0.1);
-    }
-    .header h1 { font-size:28px; margin-bottom:4px; }
-    .header p { font-size:12px; opacity:0.9; }
-
-    /* ===== CALCULADORA ESTÁNDAR ===== */
-    .standard-calculator {
-      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px;
-      background:#f5f5f5;
-    }
-    body.dark-mode .standard-calculator { background:#151718; }
-
-    .calc-container {
-      background:white; border-radius:12px; padding:20px;
-      box-shadow:0 4px 20px rgba(0,0,0,0.15); max-width:400px; width:100%;
-    }
-    body.dark-mode .calc-container { background:#1e2022; }
-
-    .calc-display {
-      background:#1a1a1a; color:#fff; text-align:right; padding:20px 15px;
-      font-family:'Courier New', monospace; font-size:48px; border-radius:8px;
-      margin-bottom:20px; min-height:80px; display:flex; align-items:center; justify-content:flex-end;
-      overflow:hidden;
-    }
-    body.dark-mode .calc-display { background:#0a0a0a; }
-
-    .calc-row { display:flex; gap:8px; margin-bottom:8px; }
-
-    .calc-btn {
-      flex:1; padding:20px 10px; border:none; border-radius:8px; font-size:18px;
-      font-weight:500; cursor:pointer; transition:all .2s; text-align:center;
-      min-height:60px; display:flex; align-items:center; justify-content:center;
-      user-select:none;
-    }
-    .calc-btn:active { transform:scale(0.95); opacity:0.8; }
-
-    .calc-btn-memory { background:#e6e6e6; color:#333; }
-    body.dark-mode .calc-btn-memory { background:#2d2d2d; color:#ccc; }
-
-    .calc-btn-operator { background:#f0f0f0; color:#333; }
-    body.dark-mode .calc-btn-operator { background:#333; color:#ccc; }
-
-    .calc-btn-number { background:#f8f8f8; color:#333; }
-    body.dark-mode .calc-btn-number { background:#2a2a2a; color:#ccc; }
-
-    .calc-btn-equals { background:#0a7ea4; color:white; font-size:24px; }
-    .calc-btn-equals:active { background:#086c8c; }
-
-    .calc-btn:hover { filter:brightness(0.95); }
-    body.dark-mode .calc-btn:hover { filter:brightness(1.2); }
-
-    .config-btn-row { margin-top:16px; padding-top:16px; border-top:1px solid #e0e0e0; }
-    body.dark-mode .config-btn-row { border-top-color:#333; }
-
-    .footer {
-      padding:12px; background:white; border-top:1px solid #E5E7EB; text-align:center;
-      font-size:12px; color:#687076;
-    }
-    body.dark-mode .footer { background:#1e2022; border-top-color:#334155; color:#9BA1A6; }
-
-    /* ===== Pixel minimizador (discreto) ===== */
-    .pixel-minimizer {
-      position:fixed; bottom:20px; right:20px; width:1px; height:1px; background:#0a7ea4;
-      border-radius:50%; cursor:pointer; z-index:3000; transition:all .3s ease;
-    }
-    .pixel-minimizer:hover, .pixel-minimizer.expanded {
-      width:50px; height:50px; background:#0a7ea4; box-shadow:0 0 15px rgba(10,126,164,0.5);
-    }
-    .pixel-minimizer.expanded::after {
-      content:'⬆'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-      color:white; font-size:20px; font-weight:bold;
-    }
-    .pixel-minimizer:hover::after {
-      content:'🔍'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-      color:white; font-size:20px; font-weight:bold;
-    }
-
-    /* ===== MODAL (base) ===== */
-    .modal-backdrop{
-      position:fixed;
-      inset:0;
-      background:rgba(0,0,0,.55);
-      display:none;
-      align-items:center;
-      justify-content:center;
-      z-index:2500;
-      padding:16px;
-    }
-    .modal-backdrop.open{ display:flex; }
-
-    .modal-card{
-      width:min(980px, 100%);
-      max-height:92vh;
-      overflow:hidden;
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
-      display:flex;
-      flex-direction:column;
-    }
-    body.dark-mode .modal-card{ background:#1e2022; }
-
-    .modal-header{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:12px 14px;
-      border-bottom:1px solid #E5E7EB;
-      gap:12px;
-    }
-    body.dark-mode .modal-header{ border-bottom-color:#334155; }
-
-    .modal-title{ font-weight:900; }
-    .modal-close{
-      border:none;
-      background:transparent;
-      font-size:18px;
-      cursor:pointer;
-      color:#687076;
-      padding:6px 10px;
-      border-radius:10px;
-    }
-    .modal-close:active{ opacity:.7; }
-    body.dark-mode .modal-close{ color:#9BA1A6; }
-
-    .modal-body{
-      display:flex;
-      flex-direction:column;
-      min-height:0;
-      flex:1;
-    }
-
-    /* ===== MINI MODAL CONTRASEÑA ===== */
-    .password-card{
-      width:min(460px, 100%);
-      max-height:92vh;
-      overflow:hidden;
-      background:#fff;
-      border-radius:16px;
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
-      display:flex;
-      flex-direction:column;
-    }
-    body.dark-mode .password-card{ background:#1e2022; }
-
-    .password-body{
-      padding:18px;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-    }
-
-    .password-help{
-      font-size:13px;
-      color:#687076;
-      line-height:1.35;
-    }
-    body.dark-mode .password-help{ color:#9BA1A6; }
-
-    .password-input{
-      width:100%;
-      padding:12px 12px;
-      border:1px solid #E5E7EB;
-      border-radius:10px;
-      font-size:14px;
-      background:white;
-      color:#11181C;
-    }
-    body.dark-mode .password-input{
-      background:#151718;
-      border-color:#334155;
-      color:#ECEDEE;
-    }
-    .password-input:focus{
-      outline:none;
-      border-color:#0a7ea4;
-      box-shadow:0 0 0 3px rgba(10,126,164,.12);
-    }
-
-    .password-error{
-      min-height:16px;
-      font-size:12px;
-      font-weight:800;
-      color:#EF4444;
-    }
-
-    .password-actions{
-      display:flex;
-      gap:10px;
-      margin-top:6px;
-    }
-    .password-actions .button{ flex:1; }
-
-    /* ===== TABS (dentro del modal) ===== */
-    .tabs {
-      display:flex; background:#f5f5f5; border-bottom:1px solid #E5E7EB; overflow-x:auto;
-    }
-    body.dark-mode .tabs { background:#1e2022; border-bottom-color:#334155; }
-
-    .tab-button {
-      flex:1; padding:12px 16px; border:none; background:none; cursor:pointer;
-      font-size:14px; font-weight:500; color:#687076;
-      border-bottom:3px solid transparent; transition:all .2s ease;
-      white-space:nowrap;
-    }
-    body.dark-mode .tab-button { color:#9BA1A6; }
-    .tab-button.active { color:#0a7ea4; border-bottom-color:#0a7ea4; }
-    .tab-button:active { opacity:.7; }
-
-    .content { flex:1; overflow-y:auto; display:none; min-height:0; }
-    .content.active { display:flex; flex-direction:column; }
-
-    /* ===== “pantalla GPS” ===== */
-    .calculator-screen {
-      flex:1; padding:20px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
-    }
-    .calculator-card {
-      background:white; border-radius:20px; padding:30px;
-      box-shadow:0 4px 16px rgba(0,0,0,0.1);
-      text-align:center; max-width:420px; width:100%;
-    }
-    body.dark-mode .calculator-card { background:#1e2022; box-shadow:0 4px 16px rgba(0,0,0,0.3); }
-    .calculator-icon { font-size:80px; margin-bottom:12px; }
-    .status-text { font-size:14px; color:#687076; margin-bottom:10px; font-weight:600; }
-    body.dark-mode .status-text { color:#9BA1A6; }
-
-    .time-display {
-      font-size:48px; font-weight:bold; color:#0a7ea4; margin-bottom:12px;
-      font-family:'Courier New', monospace;
-    }
-    .divider { height:1px; background:#E5E7EB; margin:18px 0; }
-    body.dark-mode .divider { background:#334155; }
-
-    .info-row { display:flex; justify-content:space-between; padding:8px 0; font-size:14px; }
-    .info-label { color:#687076; }
-    body.dark-mode .info-label { color:#9BA1A6; }
-    .info-value { font-weight:700; color:#11181C; }
-    body.dark-mode .info-value { color:#ECEDEE; }
-
-    .button {
-      padding:12px 24px; border:none; border-radius:12px; font-size:16px; font-weight:700;
-      cursor:pointer; transition:all .2s ease;
-    }
-    .button-primary {
-      background:#0a7ea4; color:white; width:100%; padding:16px; border-radius:16px;
-    }
-    .button-primary:active { transform:scale(.98); opacity:.9; }
-
-    .button-secondary {
-      background:#E5E7EB; color:#11181C; padding:12px 16px; font-size:14px; border-radius:12px;
-    }
-    body.dark-mode .button-secondary { background:#334155; color:#ECEDEE; }
-    .button-secondary:active { opacity:.75; }
-
-    .row-actions { display:flex; gap:10px; width:100%; }
-    .row-actions .button { flex:1; }
-
-    /* ===== MAPA ===== */
-    #leafletMap { flex:1; width:100%; height:100%; min-height:360px; }
-    .map-controls {
-      padding:16px; background:white; border-top:1px solid #E5E7EB; display:flex; gap:8px; flex-wrap:wrap;
-    }
-    body.dark-mode .map-controls { background:#1e2022; border-top-color:#334155; }
-
-    .date-selector {
-      padding:8px 12px; border:1px solid #E5E7EB; border-radius:8px; background:white;
-      cursor:pointer; font-size:12px; white-space:nowrap;
-    }
-    body.dark-mode .date-selector { background:#151718; border-color:#334155; color:#ECEDEE; }
-
-    /* ===== Registros / Favoritos ===== */
-    .records-screen, .favorites-screen { padding:16px; }
-
-    .record-date-header{
-      margin:16px 4px 8px;
-      font-size:14px;
-      font-weight:900;
-      color:#0a7ea4;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:8px;
-    }
-    body.dark-mode .record-date-header { color:#60A5FA; }
-
-    .record-hour-header{
-      margin:10px 4px 6px;
-      font-size:12px;
-      font-weight:900;
-      color:#687076;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:8px;
-      text-transform:uppercase;
-      letter-spacing:.3px;
-    }
-    body.dark-mode .record-hour-header { color:#9BA1A6; }
-
-    details.record-date-group,
-    details.record-hour-group { border-radius:12px; }
-
-    summary.record-date-header,
-    summary.record-hour-header {
-      list-style:none;
-      cursor:pointer;
-      user-select:none;
-    }
-    summary.record-date-header::-webkit-details-marker,
-    summary.record-hour-header::-webkit-details-marker { display:none; }
-
-    .collapse-icon {
-      display:inline-block;
-      transition:transform .15s ease;
-      font-weight:900;
-      opacity:.8;
-    }
-    details:not([open]) .collapse-icon { transform:rotate(-90deg); }
-
-    .record-item {
-      background:white; border:1px solid #E5E7EB; border-radius:12px; padding:16px; margin-bottom:12px;
-      display:flex; justify-content:space-between; align-items:center; gap:12px;
-    }
-    body.dark-mode .record-item { background:#1e2022; border-color:#334155; }
-
-    .record-info { flex:1; }
-    .record-time { font-size:14px; font-weight:800; color:#11181C; }
-    body.dark-mode .record-time { color:#ECEDEE; }
-    .record-coords { font-size:12px; color:#687076; font-family:'Courier New', monospace; margin-top:4px; }
-    body.dark-mode .record-coords { color:#9BA1A6; }
-
-    .record-actions { display:flex; gap:8px; flex-wrap:wrap; }
-    .btn-small { padding:6px 12px; font-size:12px; border:none; border-radius:6px; cursor:pointer; transition:all .2s; }
-    .btn-maps { background:#22C55E; color:white; }
-    .btn-delete { background:#EF4444; color:white; }
-    .btn-favorite { background:#F59E0B; color:white; }
-    .btn-small:active { opacity:.8; }
-
-    .favorite-item {
-      background:white; border:2px solid #F59E0B; border-radius:12px; padding:16px; margin-bottom:12px;
-    }
-    body.dark-mode .favorite-item { background:#1e2022; }
-    .favorite-label { font-size:12px; color:#F59E0B; font-weight:800; margin-bottom:8px; }
-
-    .empty-state { text-align:center; padding:40px 20px; color:#687076; }
-    body.dark-mode .empty-state { color:#9BA1A6; }
-    .empty-state-icon { font-size:48px; margin-bottom:16px; }
-
-    /* ===== Configuración ===== */
-    .settings-screen { padding:20px; }
-    .setting-group { background:white; border-radius:12px; padding:16px; margin-bottom:16px; }
-    body.dark-mode .setting-group { background:#1e2022; }
-    .setting-label { font-size:14px; font-weight:800; color:#11181C; margin-bottom:12px; }
-    body.dark-mode .setting-label { color:#ECEDEE; }
-
-    .setting-input {
-      width:100%; padding:10px; border:1px solid #E5E7EB; border-radius:8px; font-size:14px;
-      background:white; color:#11181C;
-    }
-    body.dark-mode .setting-input { background:#151718; border-color:#334155; color:#ECEDEE; }
-    .setting-input:focus { outline:none; border-color:#0a7ea4; box-shadow:0 0 0 3px rgba(10,126,164,.12); }
-
-    .toggle-switch { display:flex; align-items:center; gap:12px; }
-    .switch { position:relative; display:inline-block; width:50px; height:28px; }
-    .switch input { opacity:0; width:0; height:0; }
-    .slider {
-      position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-      background-color:#ccc; transition:.3s; border-radius:28px;
-    }
-    .slider:before {
-      position:absolute; content:""; height:22px; width:22px; left:3px; bottom:3px;
-      background:white; transition:.3s; border-radius:50%;
-    }
-    input:checked + .slider { background-color:#0a7ea4; }
-    input:checked + .slider:before { transform:translateX(22px); }
-
-    @media (max-width:600px){
-      .header h1 { font-size:20px; }
-      .calc-container { padding:15px; }
-      .calc-display { font-size:36px; padding:15px 10px; min-height:70px; }
-      .calc-btn { padding:15px 8px; font-size:16px; min-height:50px; }
-      .tab-button { font-size:12px; padding:10px 8px; }
-      #leafletMap { min-height:300px; }
-    }
+    :root{color-scheme:light;--bg:#edf3f7;--panel:#fff;--ink:#192f42;--muted:#607489;--line:#d9e4ed;--brand:#086e9e;--brand2:#064f76;--positive:#147d54;--negative:#b54343;--gold:#a66811;--shadow:0 10px 32px rgba(26,55,76,.07)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}a{color:var(--brand)}
+    body.dark-mode{color-scheme:dark;--bg:#101d28;--panel:#182c3a;--ink:#eaf4fc;--muted:#a9bfce;--line:#354e60;--brand:#68c5f1;--brand2:#2b8bb5;--positive:#73dba2;--negative:#ff9b9b;--gold:#e9c27b;--shadow:0 10px 32px rgba(0,0,0,.18)}
+    .top{background:linear-gradient(115deg,#064969,#0b80aa);color:#fff;padding:22px clamp(16px,4vw,48px);display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .top h1{font-size:clamp(23px,3vw,32px);margin:0 0 3px;font-weight:800}.top p{margin:0;color:#d2edf7;font-size:13px}.live-badge{border:1px solid #ffffff69;border-radius:999px;padding:9px 14px;font-weight:700;font-size:13px;background:#ffffff1b}
+    .shell{max-width:1500px;margin:0 auto;padding:20px;display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr);gap:18px}
+    .panel{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:17px;box-shadow:var(--shadow)}
+    .control{padding:23px;display:flex;flex-direction:column;gap:18px}.section-kicker{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.control h2,.map-panel h2{margin:0;font-size:22px;letter-spacing:-.02em}
+    .status{font-size:14px;font-weight:800;color:var(--negative);margin:7px 0 0}.status.running{color:var(--positive)}.countdown{font-size:clamp(40px,4.8vw,55px);font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.055em}
+    .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:var(--bg);border:1px solid var(--line);padding:14px;border-radius:12px}.metric-label{color:var(--muted);font-size:12px}.metric-value{font-size:22px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+    .last-position{border-top:1px solid var(--line);padding-top:15px}.last-position strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:7px}#lastLocation{font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:1px solid var(--line);padding:11px 13px;border-radius:11px;color:var(--ink);background:var(--panel);font-weight:700;min-height:44px}.btn:hover{filter:brightness(.96)}.btn-primary{background:#0876a5;color:white;border-color:#0876a5}.btn-danger{background:#b53c42;color:white;border-color:#b53c42}.btn-wide{grid-column:1/-1}.feedback{font-size:12px;color:var(--muted);line-height:1.55;background:var(--bg);padding:12px;border-radius:10px;min-height:58px;overflow-wrap:anywhere}
+    .map-panel{display:flex;flex-direction:column;min-height:590px;overflow:hidden}.map-toolbar{padding:18px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.map-toolbar h2{font-size:20px}.map-toolbar .small{font-size:12px;color:var(--muted);margin:4px 0 0}
+    .filters{display:flex;align-items:end;flex-wrap:wrap;gap:9px;padding:0 20px 13px}.field{display:flex;flex-direction:column;gap:5px;min-width:130px}.field label{font-weight:700;color:var(--muted);font-size:12px}.field select,.field input{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:10px;max-width:100%}
+    .toggle-row{display:flex;align-items:center;gap:7px;color:var(--ink);font-size:13px;min-height:40px}.toggle-row input{width:17px;height:17px;accent-color:#0876a5}.map-wrap{position:relative;min-height:390px;flex:1;background:#dbe7eb}
+    #leafletMap{position:absolute;inset:0;width:100%;height:100%;z-index:0}.map-note{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:500;max-width:calc(100% - 28px);padding:10px 15px;border-radius:10px;background:#ffffffed;color:#243747;box-shadow:0 3px 16px #172f4040;text-align:center;font-size:13px;pointer-events:none}.map-note[hidden]{display:none}
+    .map-footer{padding:11px 20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .lower{grid-column:1/-1;overflow:hidden}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:11px 16px 0;overflow:auto}.tab{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);padding:12px 17px;font-weight:750;white-space:nowrap}.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+    .tab-panel{padding:20px;max-height:560px;overflow:auto}.tab-panel[hidden]{display:none}.empty{color:var(--muted);text-align:center;padding:28px}.group{margin-bottom:10px;border:1px solid var(--line);border-radius:11px;overflow:hidden}.group>summary{padding:12px 15px;font-weight:750;cursor:pointer;background:var(--bg)}.subgroup{margin:10px 13px;border:1px solid var(--line);border-radius:9px;overflow:hidden}.subgroup>summary{padding:10px 12px;font-weight:700;cursor:pointer;color:var(--muted)}
+    .record{padding:12px 14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.record-main{min-width:0;overflow-wrap:anywhere}.record-main strong{display:block;font-size:14px}.record-main small{display:block;color:var(--muted);font-size:12px;margin-top:4px}.record-actions{display:flex;gap:6px;flex-wrap:wrap}.mini{padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-size:12px;font-weight:700}.mini.danger{color:var(--negative)}
+    .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:15px}.setting-box{background:var(--bg);border:1px solid var(--line);padding:17px;border-radius:12px}.setting-box h3{font-size:14px;margin:0 0 9px}.setting-box p{font-size:12px;color:var(--muted);line-height:1.5;margin:7px 0 13px}.setting-box input[type=number],.setting-box input[type=url],.setting-box input[type=file]{width:100%;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:var(--panel);padding:10px;min-width:0}.setting-box .btn{margin-top:8px;width:100%}.hint{font-size:12px;color:var(--muted);line-height:1.6;margin-top:13px}.foot{text-align:center;color:var(--muted);font-size:12px;padding:0 18px 22px}
+    @media(max-width:900px){.shell{grid-template-columns:1fr}.control{display:grid;grid-template-columns:1fr 1fr;gap:14px}.control .wide{grid-column:1/-1}.map-panel{min-height:540px}}@media(max-width:560px){.shell{padding:11px;gap:11px}.control{display:flex;padding:17px}.map-panel{min-height:510px}.map-toolbar{padding:15px 15px 10px}.filters{padding:0 15px 12px}.field{flex:1;min-width:110px}.map-wrap{min-height:320px}.tab-panel{padding:12px}.record{align-items:flex-start}.metrics{gap:8px}.map-footer{padding:10px 15px}}
   </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>🧮 Calculadora v1.0</h1>
-      <p>Estándar</p>
-    </div>
-
-    <!-- Calculadora Estándar -->
-    <div class="standard-calculator" id="standardCalculator">
-      <div class="calc-container">
-        <div class="calc-display" id="calcDisplay">0</div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-memory">MC</button>
-          <button class="calc-btn calc-btn-memory">MR</button>
-          <button class="calc-btn calc-btn-memory">M+</button>
-          <button class="calc-btn calc-btn-memory">M-</button>
-          <button class="calc-btn calc-btn-memory">MS</button>
-          <button class="calc-btn calc-btn-memory">MV</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-operator">%</button>
-          <button class="calc-btn calc-btn-operator">CE</button>
-          <button class="calc-btn calc-btn-operator">C</button>
-          <button class="calc-btn calc-btn-operator">1/x</button>
-          <button class="calc-btn calc-btn-operator">x²</button>
-          <button class="calc-btn calc-btn-operator">√</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-number">7</button>
-          <button class="calc-btn calc-btn-number">8</button>
-          <button class="calc-btn calc-btn-number">9</button>
-          <button class="calc-btn calc-btn-operator">/</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-number">4</button>
-          <button class="calc-btn calc-btn-number">5</button>
-          <button class="calc-btn calc-btn-number">6</button>
-          <button class="calc-btn calc-btn-operator">*</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-number">1</button>
-          <button class="calc-btn calc-btn-number">2</button>
-          <button class="calc-btn calc-btn-number">3</button>
-          <button class="calc-btn calc-btn-operator">-</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-number">+/-</button>
-          <button class="calc-btn calc-btn-number">0</button>
-          <button class="calc-btn calc-btn-number">.</button>
-          <button class="calc-btn calc-btn-operator">+</button>
-        </div>
-
-        <div class="calc-row">
-          <button class="calc-btn calc-btn-equals" style="flex:1;">=</button>
-        </div>
-
-        <div class="calc-row config-btn-row">
-          <button class="calc-btn calc-btn-memory" id="configBtn"
-            style="flex:1; background:#0a7ea4; color:white;">
-            Config
-          </button>
-        </div>
+  <header class="top">
+    <div><h1>Control GPS</h1><p>Seguimiento, historial y mapa de ubicaciones</p></div>
+    <span class="live-badge" id="headerStatus" role="status">Iniciando…</span>
+  </header>
+  <main class="shell">
+    <aside class="panel control" aria-label="Controles de seguimiento">
+      <div class="wide"><p class="section-kicker">Seguimiento GPS</p><h2>Centro de control</h2><p class="status" id="trackingStatus">Comprobando ubicación…</p></div>
+      <div><p class="section-kicker">Próximo registro</p><div class="countdown" id="countdown">05:00</div></div>
+      <div class="metrics wide">
+        <div class="metric"><div class="metric-label">Registros guardados</div><div class="metric-value" id="totalCount">0</div></div>
+        <div class="metric"><div class="metric-label">Intervalo</div><div class="metric-value" id="intervalText">5 min</div></div>
       </div>
-    </div>
-
-    <div class="footer">Calculadora v1.0</div>
-  </div>
-
-  <div class="pixel-minimizer" id="pixelMinimizer" title="Mostrar/Ocultar"></div>
-
-  <!-- ===== MINI MODAL: CONTRASEÑA ===== -->
-  <div class="modal-backdrop" id="passwordModal" aria-hidden="true">
-    <div class="password-card" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
-      <div class="modal-header">
-        <div class="modal-title" id="passwordModalTitle">Acceso a Config</div>
-        <button class="modal-close" id="passwordModalCloseBtn" aria-label="Cerrar">✕</button>
+      <div class="last-position wide"><strong>Última posición conocida</strong><div id="lastLocation">Sin posición disponible todavía.</div></div>
+      <div class="actions wide">
+        <button class="btn btn-primary btn-wide" id="toggleBtn" type="button">Iniciar seguimiento</button>
+        <button class="btn" id="captureBtn" type="button">Registrar ubicación</button>
+        <button class="btn" id="favoriteBtn" type="button">Añadir favorito</button>
       </div>
-
-      <div class="password-body">
-        <div class="password-help">
-          Ingresa la contraseña para abrir <strong>Config / GPS</strong>.
-        </div>
-
-        <input
-          type="password"
-          id="passwordInput"
-          class="password-input"
-          placeholder="Contraseña"
-          autocomplete="current-password"
-        />
-
-        <div class="password-error" id="passwordError"></div>
-
-        <div class="password-actions">
-          <button class="button button-secondary" id="passwordCancelBtn">Cancelar</button>
-          <button class="button button-primary" id="passwordSubmitBtn">Abrir</button>
-        </div>
+      <div class="feedback wide" id="diagnostic" role="status" aria-live="polite">El mapa puede verse aunque no existan registros. Para registrar posiciones, permite el acceso a ubicación.</div>
+    </aside>
+    <section class="panel map-panel" aria-label="Mapa GPS">
+      <div class="map-toolbar">
+        <div><h2>Mapa de ubicaciones</h2><p class="small">Puntos, recorrido, favoritos y posición reciente</p></div>
+        <button class="btn" id="centerBtn" type="button">Centrar mapa</button>
       </div>
-    </div>
-  </div>
-
-  <!-- ===== MODAL CONFIG (GPS + pestañas) ===== -->
-  <div class="modal-backdrop" id="configModal" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="configModalTitle">
-      <div class="modal-header">
-        <div class="modal-title" id="configModalTitle">Config / GPS</div>
-        <button class="modal-close" id="configModalCloseBtn" aria-label="Cerrar">✕</button>
+      <div class="filters">
+        <div class="field"><label for="dateSelector">Fecha</label><select id="dateSelector"><option value="all">Todas las fechas</option></select></div>
+        <div class="field"><label for="hourSelector">Hora</label><select id="hourSelector"><option value="all">Todas las horas</option></select></div>
+        <label class="toggle-row"><input id="favoritesOnMap" type="checkbox" checked> Favoritos</label>
       </div>
-
-      <div class="modal-body">
-        <div class="tabs" id="modalTabsBar">
-          <button class="tab-button active" data-tab="calculator">Calculadora</button>
-          <button class="tab-button" data-tab="mapTab">Mapa</button>
-          <button class="tab-button" data-tab="records">Registros</button>
-          <button class="tab-button" data-tab="favorites">Favoritos</button>
-          <button class="tab-button" data-tab="settings">Opciones</button>
-        </div>
-
-        <!-- Calculadora GPS -->
-        <div class="content active" id="calculator">
-          <div class="calculator-screen">
-            <div class="calculator-card">
-              <div class="calculator-icon">🧮</div>
-              <div class="status-text" id="status">SISTEMA INACTIVO</div>
-              <div class="time-display" id="timer">10:00</div>
-
-              <div class="divider"></div>
-
-              <div>
-                <div class="info-row">
-                  <span class="info-label">Operaciones:</span>
-                  <span class="info-value" id="cycles">0</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Intervalo:</span>
-                  <span class="info-value" id="interval">10:00</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">GPS (duración):</span>
-                  <span class="info-value" id="gpsActive">01:00</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Modo discreto:</span>
-                  <span class="info-value" id="discreteMode">Deshabilitado</span>
-                </div>
-              </div>
-
-              <div class="row-actions" style="margin-top:16px;">
-                <button class="button button-primary" id="startBtn">Iniciar</button>
-              </div>
-
-              <div class="row-actions" style="margin-top:10px;">
-                <button class="button button-secondary" id="closeConfigBtn">Cerrar Config</button>
-              </div>
-
-              <div class="row-actions" style="margin-top:10px;">
-                <button class="button button-secondary" id="manualBtn">Registrar ahora</button>
-                <button class="button button-secondary" id="permBtn">Ver permisos</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mapa -->
-        <div class="content" id="mapTab">
-          <div style="flex:1; position:relative; min-height:0;">
-            <div id="leafletMap"></div>
-          </div>
-          <div class="map-controls">
-            <select id="dateSelector" class="date-selector"></select>
-            <select id="hourSelector" class="date-selector"></select>
-            <button class="button button-secondary" id="refreshMapBtn">Actualizar</button>
-            <button class="button button-secondary" id="manualBtnMap">Registrar ahora</button>
-          </div>
-        </div>
-
-        <!-- Registros -->
-        <div class="content" id="records">
-          <div class="records-screen">
-            <div id="recordsList"></div>
-          </div>
-        </div>
-
-        <!-- Favoritos -->
-        <div class="content" id="favorites">
-          <div class="favorites-screen">
-            <div id="favoritesList"></div>
-          </div>
-        </div>
-
-        <!-- Configuración -->
-        <div class="content" id="settings">
-          <div class="settings-screen">
-            <div class="setting-group">
-              <label class="setting-label">Intervalo de ciclo (segundos)</label>
-              <input type="number" id="cycleDurationInput" class="setting-input" min="10" step="10" value="600">
-            </div>
-
-            <div class="setting-group">
-              <label class="setting-label">GPS activo (segundos)</label>
-              <input type="number" id="gpsActiveDurationInput" class="setting-input" min="5" step="5" value="60">
-            </div>
-
-            <div class="setting-group">
-              <label class="setting-label">Modo discreto</label>
-              <div class="toggle-switch">
-                <label class="switch">
-                  <input type="checkbox" id="discreteModeToggle">
-                  <span class="slider"></span>
-                </label>
-                <span id="discreteModeLabel">Deshabilitado</span>
-              </div>
-            </div>
-
-            <div class="setting-group">
-              <label class="setting-label">Tema oscuro</label>
-              <div class="toggle-switch">
-                <label class="switch">
-                  <input type="checkbox" id="darkModeToggle">
-                  <span class="slider"></span>
-                </label>
-                <span id="darkModeLabel">Deshabilitado</span>
-              </div>
-            </div>
-
-            <div class="setting-group">
-              <div class="setting-label">Diagnóstico</div>
-              <div class="record-coords" id="diagText">—</div>
-            </div>
-
-            <button class="button button-secondary" id="exportBtn" style="width:100%;">Exportar datos</button>
-            <button class="button button-secondary" id="clearBtn"
-              style="width:100%; margin-top:8px; background:#EF4444; color:white;">Limpiar todo</button>
-          </div>
-        </div>
-
+      <div class="map-wrap">
+        <div id="leafletMap" aria-label="Mapa interactivo de OpenStreetMap"></div>
+        <div class="map-note" id="mapMessage">Cargando mapa…</div>
       </div>
-    </div>
-  </div>
-
+      <div class="map-footer"><span id="mapCount">0 ubicaciones en el filtro</span><span>Verde: inicio · Rojo: final · Azul: última posición · Dorado: favorito</span></div>
+    </section>
+    <section class="panel lower" aria-label="Historial y configuración">
+      <nav class="tabs" aria-label="Secciones">
+        <button class="tab active" data-tab="records" type="button">Registros</button>
+        <button class="tab" data-tab="favorites" type="button">Favoritos</button>
+        <button class="tab" data-tab="settings" type="button">Opciones y datos</button>
+      </nav>
+      <div id="records" class="tab-panel"></div>
+      <div id="favorites" class="tab-panel" hidden></div>
+      <div id="settings" class="tab-panel" hidden>
+        <div class="settings">
+          <div class="setting-box">
+            <h3>Intervalo de registro</h3><p>La frecuencia predeterminada es de 5 minutos. El navegador debe permitir el GPS.</p>
+            <label class="field" for="cycleDurationInput">Segundos <input id="cycleDurationInput" type="number" min="30" max="86400" step="30" value="300"></label>
+            <label class="toggle-row"><input id="autoStartToggle" type="checkbox" checked> Reanudar seguimiento al abrir</label>
+          </div>
+          <div class="setting-box">
+            <h3>Presentación</h3><label class="toggle-row"><input id="darkModeToggle" type="checkbox"> Tema oscuro</label>
+            <p>Los filtros, favoritos, intervalos y últimas coordenadas se conservan en este navegador.</p>
+          </div>
+          <div class="setting-box">
+            <h3>Exportar e importar</h3>
+            <p>Exporta una copia JSON o importa JSON/CSV, incluidos CSV de Google Sheets con columnas fecha, hora y coordenadas.</p>
+            <button class="btn" id="exportBtn" type="button">Descargar copia JSON</button>
+            <input id="importFile" type="file" accept=".json,.csv,text/csv,application/json" aria-label="Importar historial">
+            <div class="hint" id="importStatus" aria-live="polite">No se han importado archivos.</div>
+          </div>
+          <div class="setting-box">
+            <h3>Importar CSV desde una URL</h3>
+            <p>Usa solo un enlace de exportación CSV compartido por ti. No permite acceder a hojas privadas sin autorización ni requiere publicar tu hoja.</p>
+            <input id="csvUrl" type="url" placeholder="https://…/export?format=csv" aria-label="URL de CSV">
+            <button class="btn" id="syncCsvBtn" type="button">Importar CSV de la URL</button>
+          </div>
+          <div class="setting-box">
+            <h3>Eliminar información local</h3><p>Borra los registros y favoritos de este navegador. No modifica datos remotos ni permite recuperarlos sin una copia.</p>
+            <button class="btn btn-danger" id="clearBtn" type="button">Borrar registros y favoritos</button>
+          </div>
+        </div>
+        <div class="hint">Privacidad: la geolocalización se guarda localmente en este dispositivo. Esta versión no envía automáticamente coordenadas a Google Sheets. El rastreo periódico en segundo plano no está garantizado si el navegador suspende la pestaña o la aplicación.</div>
+      </div>
+    </section>
+  </main>
+  <footer class="foot">Control GPS · Mapas de © OpenStreetMap · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script>
-    // =========================
-    // CALCULADORA ESTÁNDAR
-    // =========================
-    let calcValue = '0';
-    let previousValue = null;
-    let operator = null;
-    let waitingForNewValue = false;
-
-    function updateCalcDisplay() {
-      const display = document.getElementById('calcDisplay');
-      display.textContent = calcValue;
-    }
-
-    function inputDigit(digit) {
-      if (waitingForNewValue) {
-        calcValue = digit;
-        waitingForNewValue = false;
-      } else {
-        calcValue = calcValue === '0' ? digit : calcValue + digit;
+    (function () {
+      'use strict';
+      const KEY = 'gpsTrackerState';
+      const el = (id) => document.getElementById(id);
+      const dateKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+      const hourKey = (t) => String(new Date(t).getHours());
+      const fmtTime = (t) => new Date(t).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'medium'});
+      const num = (v) => Number(v);
+      const valid = (loc) => loc && Number.isFinite(num(loc.latitude)) && Number.isFinite(num(loc.longitude)) && Math.abs(num(loc.latitude)) <= 90 && Math.abs(num(loc.longitude)) <= 180 && Number.isFinite(num(loc.timestamp)) && num(loc.timestamp)>0;
+      const normalize = (loc) => ({latitude:num(loc.latitude),longitude:num(loc.longitude),accuracy:loc.accuracy!==null && loc.accuracy!==undefined && loc.accuracy!=='' && Number.isFinite(num(loc.accuracy)) ? num(loc.accuracy):null,timestamp:num(loc.timestamp)});
+      const mapLink = (p) => 'https://www.google.com/maps/search/?api=1&query=' + p.latitude + ',' + p.longitude;
+      const formatCoords = (p) => p.latitude.toFixed(6) + ', ' + p.longitude.toFixed(6);
+      const saved = (() => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { return {}; } })();
+      const state = {
+        days: saved.days && typeof saved.days === 'object' ? saved.days : {},
+        favorites: Array.isArray(saved.favorites) ? saved.favorites.filter(valid).map((f) => Object.assign(normalize(f),{label:String(f.label || '')})) : [],
+        lastLocation: valid(saved.lastLocation) ? normalize(saved.lastLocation) : null,
+        cycleDuration: Number.isFinite(num(saved.cycleDuration)) && num(saved.cycleDuration)>=30000 ? Math.min(num(saved.cycleDuration),86400000) : 300000,
+        autoStart: saved.autoStart !== false,
+        darkMode: !!saved.darkMode,
+        mapSelectedDate: saved.mapSelectedDate || 'all',
+        mapSelectedHour: saved.mapSelectedHour || 'all',
+        showFavorites: saved.showFavorites !== false,
+        mapView: saved.mapView || null,
+        csvUrl: saved.csvUrl || '',
+        isRunning: false
+      };
+      let map = null, overlays = null, nextCaptureAt = 0, ticker = null, captureBusy = false, mapSaveTimeout = null, lastFitKey = '';
+      function allLocations() {
+        const result = [];
+        Object.keys(state.days).forEach((dk) => {
+          const day = state.days[dk];
+          if (!day || !day.hours) return;
+          Object.keys(day.hours).forEach((hk) => {
+            const bucket = day.hours[hk];
+            (Array.isArray(bucket && bucket.locations) ? bucket.locations : []).forEach((p) => {
+              if (valid(p)) result.push(normalize(p));
+            });
+          });
+        });
+        return result.sort((a,b) => a.timestamp-b.timestamp);
       }
-      updateCalcDisplay();
-    }
-
-    function inputDecimal() {
-      if (waitingForNewValue) {
-        calcValue = '0.';
-        waitingForNewValue = false;
-        updateCalcDisplay();
-        return;
+      function store() {
+        try {
+          localStorage.setItem(KEY, JSON.stringify({
+            days:state.days,favorites:state.favorites,lastLocation:state.lastLocation,
+            cycleDuration:state.cycleDuration,autoStart:state.autoStart,darkMode:state.darkMode,
+            mapSelectedDate:state.mapSelectedDate,mapSelectedHour:state.mapSelectedHour,
+            showFavorites:state.showFavorites,mapView:state.mapView,csvUrl:state.csvUrl,
+            cyclesCompleted:allLocations().length
+          }));
+        } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
       }
-      if (!calcValue.includes('.')) {
-        calcValue += '.';
-        updateCalcDisplay();
+      function setDiagnostic(message) { el('diagnostic').textContent=message; }
+      function appendLocation(p) {
+        const loc = normalize(p), dk = dateKey(loc.timestamp), hk = hourKey(loc.timestamp);
+        if (!state.days[dk]) state.days[dk]={date:dk,hours:{}};
+        if (!state.days[dk].hours[hk]) state.days[dk].hours[hk]={hour:Number(hk),locations:[]};
+        state.days[dk].hours[hk].locations.push(loc);
+        state.lastLocation=loc;
       }
-    }
-
-    function handleOperator(nextOperator) {
-      const inputValue = parseFloat(calcValue);
-
-      if (previousValue === null) {
-        previousValue = inputValue;
-      } else if (operator) {
-        const currentValue = previousValue || 0;
-        let newValue;
-
-        switch(operator) {
-          case '+': newValue = currentValue + inputValue; break;
-          case '-': newValue = currentValue - inputValue; break;
-          case '*': newValue = currentValue * inputValue; break;
-          case '/': newValue = currentValue / inputValue; break;
-          default: return;
+      function mergeLocations(items) {
+        const keys = new Set(allLocations().map((p) => [p.timestamp,p.latitude,p.longitude].join('|')));
+        let added=0;
+        for (const input of items) {
+          if (!valid(input)) continue;
+          const loc=normalize(input), key=[loc.timestamp,loc.latitude,loc.longitude].join('|');
+          if (keys.has(key)) continue;
+          keys.add(key);appendLocation(loc);added++;
         }
-
-        calcValue = String(newValue);
-        previousValue = newValue;
-        updateCalcDisplay();
+        if (added) { store();renderAll(true); }
+        return added;
       }
-
-      waitingForNewValue = true;
-      operator = nextOperator;
-    }
-
-    function resetCalculator() {
-      calcValue = '0';
-      previousValue = null;
-      operator = null;
-      waitingForNewValue = false;
-      updateCalcDisplay();
-    }
-
-    function calculate() {
-      if (previousValue !== null && operator) {
-        const inputValue = parseFloat(calcValue);
-        let result;
-
-        switch(operator) {
-          case '+': result = previousValue + inputValue; break;
-          case '-': result = previousValue - inputValue; break;
-          case '*': result = previousValue * inputValue; break;
-          case '/': result = previousValue / inputValue; break;
-          default: return;
+      function readableError(e) {
+        if (!window.isSecureContext) return 'La ubicación requiere HTTPS o localhost.';
+        if (e && e.code===1) return 'Permiso de ubicación denegado. Actívalo en el navegador.';
+        if (e && e.code===2) return 'No se pudo determinar la posición. Revisa el GPS y la conexión.';
+        if (e && e.code===3) return 'El GPS tardó demasiado. Prueba en un espacio abierto.';
+        return (e && e.message) || 'No se pudo obtener la ubicación.';
+      }
+      function onePosition(options) {
+        return new Promise((resolve,reject) => {
+          if (!navigator.geolocation) return reject(new Error('Este dispositivo o navegador no dispone de geolocalización.'));
+          navigator.geolocation.getCurrentPosition(resolve,reject,options);
+        });
+      }
+      async function acquirePosition() {
+        if (!window.isSecureContext) throw new Error('La ubicación requiere HTTPS o localhost.');
+        try { return await onePosition({enableHighAccuracy:true,timeout:18000,maximumAge:0}); }
+        catch(e) {
+          if (e && e.code===1) throw e;
+          return onePosition({enableHighAccuracy:false,timeout:15000,maximumAge:10000});
         }
-
-        calcValue = String(result);
-        previousValue = null;
-        operator = null;
-        waitingForNewValue = true;
-        updateCalcDisplay();
       }
-    }
-
-    function handleSpecialOperation(op) {
-      const value = parseFloat(calcValue);
-      let result;
-
-      switch(op) {
-        case 'percent': result = value / 100; break;
-        case 'clearEntry': calcValue = '0'; updateCalcDisplay(); return;
-        case 'clear': resetCalculator(); return;
-        case 'reciprocal': result = 1 / value; break;
-        case 'square': result = value * value; break;
-        case 'sqrt': result = Math.sqrt(value); break;
-        case 'plusMinus': result = value * -1; break;
-        default: return;
+      async function capture(kind) {
+        if (captureBusy) return;
+        captureBusy=true;el('captureBtn').disabled=true;el('favoriteBtn').disabled=true;
+        setDiagnostic('Solicitando posición GPS…');
+        try {
+          const pos=await acquirePosition();
+          const p={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy,timestamp:pos.timestamp || Date.now()};
+          if (!valid(p)) throw new Error('El GPS devolvió coordenadas inválidas.');
+          state.lastLocation=normalize(p);
+          if (kind==='favorite') {
+            state.favorites.push(Object.assign({},normalize(p),{label:fmtTime(p.timestamp)}));
+            setDiagnostic('Favorito guardado en este navegador.');
+          } else {
+            appendLocation(p);
+            setDiagnostic('Ubicación registrada: '+formatCoords(normalize(p))+' (precisión ±'+Math.round(p.accuracy || 0)+' m).');
+          }
+          store();renderAll(true);
+        } catch(e) { setDiagnostic(readableError(e));renderStatus(); }
+        finally { captureBusy=false;el('captureBtn').disabled=false;el('favoriteBtn').disabled=false; }
       }
-
-      calcValue = String(result);
-      waitingForNewValue = true;
-      updateCalcDisplay();
-    }
-
-    // =========================
-    // ESTADO GLOBAL GPS
-    // =========================
-    const state = {
-      isRunning: false,
-      isGPSActive: false,
-      timeRemaining: 600000,
-      cyclesCompleted: 0,
-      lastLocation: null,
-
-      cycleDuration: 600000,
-      gpsActiveDuration: 60000,
-
-      discreteMode: false,
-      isMinimized: false,
-      darkMode: false,
-
-      days: {},
-      favorites: [],
-
-      // Modal/tab state
-      configOpen: false,
-      lastFullTab: 'calculator',
-
-      mapSelectedDate: '',
-      mapSelectedHour: '',
-      mapView: null,
-
-      map: null,
-      markers: [],
-      polyline: null,
-
-      lastError: null,
-      lastDiag: null,
-    };
-
-    // =========================
-    // BLOQUEO DE CONFIG POR CONTRASEÑA (mini modal)
-    // =========================
-    const CONFIG_PASSWORD = 'wrj';
-    const CONFIG_UNLOCK_KEY = 'configUnlocked'; // solo por sesión (pestaña)
-
-    function isConfigUnlocked() {
-      return sessionStorage.getItem(CONFIG_UNLOCK_KEY) === '1';
-    }
-
-    function setConfigUnlocked() {
-      sessionStorage.setItem(CONFIG_UNLOCK_KEY, '1');
-    }
-
-    function openPasswordModal() {
-      if (state.isMinimized) return;
-
-      const modal = document.getElementById('passwordModal');
-      const input = document.getElementById('passwordInput');
-      const err = document.getElementById('passwordError');
-
-      if (err) err.textContent = '';
-      if (input) input.value = '';
-
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-
-      setTimeout(() => { if (input) input.focus(); }, 50);
-    }
-
-    function closePasswordModal() {
-      const modal = document.getElementById('passwordModal');
-      const err = document.getElementById('passwordError');
-      const input = document.getElementById('passwordInput');
-
-      if (modal) {
-        modal.classList.remove('open');
-        modal.setAttribute('aria-hidden', 'true');
+      function formatCountdown(ms) {
+        const sec=Math.max(0,Math.ceil(ms/1000));
+        return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
       }
-      if (err) err.textContent = '';
-      if (input) input.value = '';
-    }
-
-    function showPasswordError(text) {
-      const err = document.getElementById('passwordError');
-      if (err) err.textContent = text || '';
-    }
-
-    function submitPassword() {
-      const input = document.getElementById('passwordInput');
-      const value = (input?.value || '').trim();
-
-      if (!value) {
-        showPasswordError('Ingresa la contraseña');
-        if (input) input.focus();
-        return;
+      function tick() {
+        if (!state.isRunning) return;
+        if (Date.now()>=nextCaptureAt) {
+          nextCaptureAt=Date.now()+state.cycleDuration;
+          capture('history');
+        }
+        el('countdown').textContent=formatCountdown(nextCaptureAt-Date.now());
       }
-
-      if (value === CONFIG_PASSWORD) {
-        setConfigUnlocked();
-        closePasswordModal();
-        updateDiag('Config desbloqueada');
-        openConfigModal();
-        return;
+      function startTracking() {
+        if (state.isRunning) return;
+        state.isRunning=true;state.autoStart=true;
+        nextCaptureAt=Date.now()+state.cycleDuration;
+        if (ticker) clearInterval(ticker);
+        ticker=setInterval(tick,1000);
+        capture('history');
+        renderStatus();store();
       }
-
-      showPasswordError('Contraseña incorrecta');
-      updateDiag('Contraseña incorrecta');
-      if (input) {
-        input.select();
-        input.focus();
+      function stopTracking() {
+        state.isRunning=false;state.autoStart=false;
+        if(ticker) clearInterval(ticker);
+        ticker=null;nextCaptureAt=0;
+        renderStatus();store();
+        setDiagnostic('Seguimiento detenido. Puedes registrar puntos manualmente.');
       }
-    }
-
-    // =========================
-    // ALMACENAMIENTO
-    // =========================
-    function saveState() {
-      localStorage.setItem('gpsTrackerState', JSON.stringify({
-        cyclesCompleted: state.cyclesCompleted,
-        lastLocation: state.lastLocation,
-        cycleDuration: state.cycleDuration,
-        gpsActiveDuration: state.gpsActiveDuration,
-        discreteMode: state.discreteMode,
-        isMinimized: state.isMinimized,
-        darkMode: state.darkMode,
-        days: state.days,
-        favorites: state.favorites,
-
-        lastFullTab: state.lastFullTab,
-        mapSelectedDate: state.mapSelectedDate,
-        mapSelectedHour: state.mapSelectedHour,
-        mapView: state.mapView,
+      function renderStatus() {
+        const count=allLocations().length;
+        el('totalCount').textContent=count.toLocaleString('es-CO');
+        el('intervalText').textContent=Math.round(state.cycleDuration/60000*10)/10+' min';
+        el('trackingStatus').textContent=state.isRunning?'SEGUIMIENTO ACTIVO':'SEGUIMIENTO DETENIDO';
+        el('trackingStatus').classList.toggle('running',state.isRunning);
+        el('headerStatus').textContent=state.isRunning?'● GPS activo':'○ GPS detenido';
+        el('toggleBtn').textContent=state.isRunning?'Detener seguimiento':'Iniciar seguimiento';
+        el('toggleBtn').classList.toggle('btn-danger',state.isRunning);
+        el('toggleBtn').classList.toggle('btn-primary',!state.isRunning);
+        el('autoStartToggle').checked=state.autoStart;
+        el('countdown').textContent=state.isRunning?formatCountdown(nextCaptureAt-Date.now()):'--:--';
+        const loc=el('lastLocation');
+        loc.replaceChildren();
+        if (!state.lastLocation) {loc.textContent='Sin posición disponible todavía.';return;}
+        const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=formatCoords(state.lastLocation);
+        loc.append(link,document.createElement('br'),document.createTextNode(fmtTime(state.lastLocation.timestamp)));
+      }
+      function fillSelect(select,choices,wanted) {
+        select.replaceChildren();
+        choices.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});
+        select.value=choices.some(([v])=>v===wanted)?wanted:'all';
+        return select.value;
+      }
+      function renderFilters() {
+        const locations=allLocations();
+        const dates=[...new Set(locations.map((p)=>dateKey(p.timestamp)))].sort().reverse();
+        const dateOptions=[['all','Todas las fechas'],...dates.map((d)=>[d,d+' ('+locations.filter((p)=>dateKey(p.timestamp)===d).length+')'])];
+        state.mapSelectedDate=fillSelect(el('dateSelector'),dateOptions,state.mapSelectedDate);
+        const filtered=locations.filter((p)=>state.mapSelectedDate==='all'||dateKey(p.timestamp)===state.mapSelectedDate);
+        const hours=[...new Set(filtered.map((p)=>hourKey(p.timestamp)))].sort((a,b)=>num(a)-num(b));
+        const hourOptions=[['all','Todas las horas'],...hours.map((h)=>[h,h.padStart(2,'0')+':00 ('+filtered.filter((p)=>hourKey(p.timestamp)===h).length+')'])];
+        state.mapSelectedHour=fillSelect(el('hourSelector'),hourOptions,state.mapSelectedHour);
+        el('favoritesOnMap').checked=state.showFavorites;
+      }
+      function filteredLocations() {
+        return allLocations().filter((p)=>(state.mapSelectedDate==='all'||dateKey(p.timestamp)===state.mapSelectedDate)&&(state.mapSelectedHour==='all'||hourKey(p.timestamp)===state.mapSelectedHour));
+      }
+      function initMap() {
+        if(map) return true;
+        if(typeof window.L==='undefined') {
+          el('mapMessage').textContent='El mapa no pudo cargar Leaflet. Comprueba la conexión y vuelve a abrir la página.';
+          return false;
+        }
+        try {
+          map=L.map('leafletMap',{preferCanvas:true}).setView([18,0],2);
+          const tiles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+          let tileFailures=0;tiles.on('tileerror',()=>{if(++tileFailures===4)setDiagnostic('No se descargan las imágenes del mapa. Comprueba tu conexión o los bloqueos de OpenStreetMap.');});
+          overlays=L.layerGroup().addTo(map);
+          if (state.mapView && Array.isArray(state.mapView.center) && state.mapView.center.length===2 && state.mapView.center.every(Number.isFinite) && Number.isFinite(state.mapView.zoom)) {
+            map.setView(state.mapView.center,Math.min(19,Math.max(2,state.mapView.zoom)));
+          }
+          map.on('moveend',()=>{
+            if(mapSaveTimeout) clearTimeout(mapSaveTimeout);
+            mapSaveTimeout=setTimeout(()=>{const center=map.getCenter();state.mapView={center:[center.lat,center.lng],zoom:map.getZoom()};store();},600);
+          });
+          setTimeout(()=>{if(map)map.invalidateSize();},150);
+          return true;
+        } catch(e) {el('mapMessage').textContent='No se pudo crear el mapa: '+readableError(e);return false;}
+      }
+      function markerPopup(p,label) {
+        const wrapper=document.createElement('div');
+        const title=document.createElement('strong');title.textContent=label;
+        const coords=document.createElement('div');coords.textContent=formatCoords(p);
+        const time=document.createElement('div');time.textContent=fmtTime(p.timestamp);
+        const link=document.createElement('a');link.href=mapLink(p);link.textContent='Abrir en Google Maps';link.target='_blank';link.rel='noopener noreferrer';
+        wrapper.append(title,document.createElement('br'),coords,time,link);
+        return wrapper;
+      }
+      function renderMap(forceFit=false) {
+        const points=filteredLocations();
+        el('mapCount').textContent=points.length+' ubicaciones en el filtro';
+        if(!initMap()) return;
+        overlays.clearLayers();
+        const bounds=[];
+        const secondaryBounds=[];
+        if(points.length>1) {
+          let segment=[points[0]];
+          const drawSegment=()=>{if(segment.length>1)L.polyline(segment.map((p)=>[p.latitude,p.longitude]),{color:'#147eae',weight:4,opacity:.8}).addTo(overlays);};
+          for(let i=1;i<points.length;i++){
+            const gap=points[i].timestamp-points[i-1].timestamp;
+            if(dateKey(points[i].timestamp)!==dateKey(points[i-1].timestamp)||gap>Math.max(1800000,state.cycleDuration*4)){
+              drawSegment();segment=[points[i]];
+            }else segment.push(points[i]);
+          }
+          drawSegment();
+        }
+        points.forEach((p,i)=>{
+          const color=i===0?'#169b62':i===points.length-1?'#c8424c':'#147eae';
+          L.circleMarker([p.latitude,p.longitude],{radius:7,color:'#fff',weight:2,fillColor:color,fillOpacity:.97}).bindPopup(markerPopup(p,'Registro '+(i+1))).addTo(overlays);
+          bounds.push([p.latitude,p.longitude]);
+        });
+        if(state.showFavorites) {
+          state.favorites.filter(valid).forEach((f)=>{
+            L.circleMarker([f.latitude,f.longitude],{radius:8,weight:2,color:'#fff',fillColor:'#d39b36',fillOpacity:1}).bindPopup(markerPopup(f,'Favorito: '+(f.label || 'sin nombre'))).addTo(overlays);
+            secondaryBounds.push([f.latitude,f.longitude]);
+          });
+        }
+        if(valid(state.lastLocation)) {
+          const p=state.lastLocation;
+          L.circleMarker([p.latitude,p.longitude],{radius:10,color:'#fff',weight:3,fillColor:'#2089f5',fillOpacity:1}).bindPopup(markerPopup(p,'Última posición conocida')).addTo(overlays);
+          secondaryBounds.push([p.latitude,p.longitude]);
+        }
+        const note=el('mapMessage');
+        note.hidden=points.length>0;
+        if(!points.length) note.textContent=state.lastLocation?'No hay registros para este filtro. La última posición se muestra en azul.':'Todavía no hay registros para este filtro. Inicia el GPS o importa un historial.';
+        const fitKey=state.mapSelectedDate+'|'+state.mapSelectedHour+'|'+state.showFavorites;
+        const fitBounds=bounds.length?bounds:secondaryBounds;
+        if(fitBounds.length && (forceFit||fitKey!==lastFitKey)) {
+          if(fitBounds.length===1) map.setView(fitBounds[0],15);
+          else map.fitBounds(fitBounds,{padding:[42,42],maxZoom:16});
+        }
+        lastFitKey=fitKey;
+        setTimeout(()=>{if(map)map.invalidateSize();},60);
+      }
+      function btn(text,action,danger=false) {
+        const b=document.createElement('button');b.type='button';b.textContent=text;b.className='mini'+(danger?' danger':'');b.addEventListener('click',action);return b;
+      }
+      function recordRow(p,withFavorite=true) {
+        const row=document.createElement('div');row.className='record';
+        const info=document.createElement('div');info.className='record-main';
+        const t=document.createElement('strong');t.textContent=fmtTime(p.timestamp);
+        const c=document.createElement('small');c.textContent=formatCoords(p)+(Number.isFinite(p.accuracy)?' · ±'+Math.round(p.accuracy)+' m':'');
+        info.append(t,c);
+        const actions=document.createElement('div');actions.className='record-actions';
+        actions.append(btn('Ver mapa',()=>{el('dateSelector').value=dateKey(p.timestamp);state.mapSelectedDate=dateKey(p.timestamp);renderFilters();el('hourSelector').value=hourKey(p.timestamp);state.mapSelectedHour=hourKey(p.timestamp);store();renderMap(true);el('leafletMap').scrollIntoView({behavior:'smooth',block:'center'});}));
+        actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
+        if(withFavorite) actions.append(btn('★ Favorito',()=>{state.favorites.push(Object.assign({},p,{label:fmtTime(p.timestamp)}));store();renderAll();}));
+        actions.append(btn('Eliminar',()=>{deleteLocation(p);},true));
+        row.append(info,actions);return row;
+      }
+      function deleteLocation(p) {
+        const dk=dateKey(p.timestamp), hk=hourKey(p.timestamp), bucket=state.days[dk]&&state.days[dk].hours&&state.days[dk].hours[hk];
+        if(!bucket || !Array.isArray(bucket.locations)) return;
+        const i=bucket.locations.findIndex((item)=>valid(item)&&Number(item.timestamp)===p.timestamp&&Number(item.latitude)===p.latitude&&Number(item.longitude)===p.longitude);
+        if(i<0)return;
+        bucket.locations.splice(i,1);
+        if(!bucket.locations.length) delete state.days[dk].hours[hk];
+        if(!Object.keys(state.days[dk].hours).length) delete state.days[dk];
+        store();renderAll();
+      }
+      function renderRecords() {
+        const root=el('records');root.replaceChildren();
+        const locations=allLocations().reverse();
+        if(!locations.length) {const m=document.createElement('div');m.className='empty';m.textContent='Sin registros. Activa el seguimiento, registra una posición o importa un historial.';root.append(m);return;}
+        const dates=[...new Set(locations.map((p)=>dateKey(p.timestamp)))];
+        dates.forEach((dk)=>{
+          const group=document.createElement('details');group.className='group';group.open=dates.length<5;
+          const summary=document.createElement('summary'), dayLocations=locations.filter((p)=>dateKey(p.timestamp)===dk);
+          summary.textContent=dk+' · '+dayLocations.length+' ubicaciones';group.append(summary);
+          const hours=[...new Set(dayLocations.map((p)=>hourKey(p.timestamp)))].sort((a,b)=>num(b)-num(a));
+          hours.forEach((hk)=>{
+            const sub=document.createElement('details');sub.className='subgroup';sub.open=hours.length<4;
+            const head=document.createElement('summary'), list=dayLocations.filter((p)=>hourKey(p.timestamp)===hk);
+            head.textContent=hk.padStart(2,'0')+':00 · '+list.length+' registros';sub.append(head);
+            list.forEach((p)=>sub.append(recordRow(p)));
+            group.append(sub);
+          });
+          root.append(group);
+        });
+      }
+      function renderFavorites() {
+        const root=el('favorites');root.replaceChildren();
+        const favs=[...state.favorites].filter(valid).sort((a,b)=>b.timestamp-a.timestamp);
+        if(!favs.length) {const m=document.createElement('div');m.className='empty';m.textContent='Todavía no hay favoritos.';root.append(m);return;}
+        favs.forEach((p)=>{
+          const row=document.createElement('div');row.className='record';
+          const info=document.createElement('div');info.className='record-main';
+          const title=document.createElement('strong');title.textContent=p.label||fmtTime(p.timestamp);
+          const details=document.createElement('small');details.textContent=formatCoords(p)+' · '+fmtTime(p.timestamp);
+          info.append(title,details);
+          const actions=document.createElement('div');actions.className='record-actions';
+          actions.append(btn('Google Maps',()=>window.open(mapLink(p),'_blank','noopener,noreferrer')));
+          actions.append(btn('Eliminar',()=>{const idx=state.favorites.indexOf(p);if(idx>=0){state.favorites.splice(idx,1);store();renderAll();}},true));
+          row.append(info,actions);root.append(row);
+        });
+      }
+      function renderAll(fit=false) {renderStatus();renderFilters();renderRecords();renderFavorites();renderMap(fit);}
+      function parseCsv(text) {
+        const first=(text.replace(/^\uFEFF/,'').split(/\r?\n/,1)[0]||'');
+        const delimiter=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?';':',';
+        const rows=[];let row=[],field='',quoted=false;
+        const input=text.replace(/^\uFEFF/,'');
+        for(let i=0;i<input.length;i++){
+          const ch=input[i];
+          if(ch==='"'){if(quoted&&input[i+1]==='"'){field+='"';i++;}else quoted=!quoted;}
+          else if(ch===delimiter&&!quoted){row.push(field.trim());field='';}
+          else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&input[i+1]==='\n')i++;row.push(field.trim());if(row.some(Boolean))rows.push(row);row=[];field='';}
+          else field+=ch;
+        }
+        row.push(field.trim());if(row.some(Boolean))rows.push(row);
+        return rows;
+      }
+      function parseTimestamp(date,time) {
+        const d=String(date||'').trim(),t=String(time||'00:00').trim();
+        let match=d.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/),yr,mo,day;
+        if(match){yr=+match[1];mo=+match[2];day=+match[3];}
+        else {match=d.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);if(!match)return NaN;day=+match[1];mo=+match[2];yr=+match[3];}
+        const hm=t.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        const dt=new Date(yr,mo-1,day,hm?+hm[1]:0,hm?+hm[2]:0,hm?+(hm[3]||0):0);
+        return dt.getFullYear()===yr&&dt.getMonth()===mo-1&&dt.getDate()===day?dt.getTime():NaN;
+      }
+      function parseCoordinateString(value) {
+        const m=String(value||'').replace(/%2C/ig,',').match(/(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)/);
+        if(!m)return null;
+        return {latitude:Number(m[1]),longitude:Number(m[2])};
+      }
+      function itemsFromCsv(text) {
+        const rows=parseCsv(text);if(rows.length<2)throw new Error('El CSV no contiene filas de datos.');
+        const head=rows[0].map((h)=>h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim());
+        const field=(row,names)=>{let i=head.findIndex((h)=>names.includes(h));return i<0?'':row[i];};
+        return rows.slice(1).map((row)=>{
+          const coords=parseCoordinateString(field(row,['coordenadas','coordenada','ubicacion','location','coordinates']));
+          const lat=coords?coords.latitude:Number(field(row,['latitud','latitude','lat']));
+          const lng=coords?coords.longitude:Number(field(row,['longitud','longitude','lng','lon']));
+          const rawTimestamp=field(row,['timestamp','fecha hora','fecha_hora']);
+          const numericTimestamp=Number(rawTimestamp);
+          const timestamp=rawTimestamp?(Number.isFinite(numericTimestamp)&&numericTimestamp>0?(numericTimestamp<1e11?numericTimestamp*1000:numericTimestamp):Date.parse(rawTimestamp)):
+            parseTimestamp(field(row,['fecha','date']),field(row,['hora','time']));
+          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null};
+        }).filter(valid);
+      }
+      function itemsFromJson(text) {
+        const data=JSON.parse(text);
+        if(Array.isArray(data))return data;
+        if(Array.isArray(data.locations))return data.locations;
+        if(Array.isArray(data.records))return data.records;
+        if(data.days && typeof data.days==='object'){
+          const result=[];
+          Object.values(data.days).forEach((d)=>Object.values((d&&d.hours)||{}).forEach((h)=>(h.locations||[]).forEach((p)=>result.push(p))));
+          return result;
+        }
+        throw new Error('El JSON no contiene ubicaciones reconocibles.');
+      }
+      async function importText(text,isJson) {
+        const data=isJson?JSON.parse(text):null;
+        const items=isJson?itemsFromJson(text):itemsFromCsv(text);
+        const count=mergeLocations(items);
+        let favoritesAdded=0;
+        if(data && Array.isArray(data.favorites)){
+          const known=new Set(state.favorites.map((p)=>[p.timestamp,p.latitude,p.longitude].join('|')));
+          data.favorites.forEach((f)=>{if(!valid(f))return;const p=Object.assign(normalize(f),{label:String(f.label||'')});const key=[p.timestamp,p.latitude,p.longitude].join('|');if(!known.has(key)){known.add(key);state.favorites.push(p);favoritesAdded++;}});
+          if(favoritesAdded){store();renderAll(true);}
+        }
+        const message='Importación: '+count+' registros nuevos de '+items.length+' válidos y '+favoritesAdded+' favoritos.';
+        el('importStatus').textContent=message;setDiagnostic(message);
+      }
+      function exportData() {
+        const json=JSON.stringify({version:2,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites},null,2);
+        const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+        const a=document.createElement('a');a.href=url;a.download='control-gps-'+dateKey(Date.now())+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+      document.querySelectorAll('.tab').forEach((tab)=>tab.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach((t)=>t.classList.toggle('active',t===tab));
+        document.querySelectorAll('.tab-panel').forEach((p)=>p.hidden=p.id!==tab.dataset.tab);
       }));
-    }
-
-    function loadState() {
-      const saved = localStorage.getItem('gpsTrackerState');
-      if (!saved) return;
-      try {
-        const data = JSON.parse(saved);
-
-        state.lastLocation = data.lastLocation || null;
-        state.cycleDuration = data.cycleDuration || 600000;
-        state.gpsActiveDuration = data.gpsActiveDuration || 60000;
-        state.discreteMode = !!data.discreteMode;
-        state.isMinimized = !!data.isMinimized;
-        state.darkMode = !!data.darkMode;
-        state.days = data.days || {};
-        state.favorites = data.favorites || [];
-
-        state.lastFullTab = data.lastFullTab || 'calculator';
-        state.mapSelectedDate = data.mapSelectedDate || '';
-        state.mapSelectedHour = data.mapSelectedHour || '';
-        state.mapView = data.mapView || null;
-
-        state.cyclesCompleted = countAllLocations();
-
-        if (state.discreteMode) {
-          state.isMinimized = true;
-        }
-      } catch {
-        localStorage.removeItem('gpsTrackerState');
-      }
-    }
-
-    // =========================
-    // UTILIDADES
-    // =========================
-    function formatTime(ms) {
-      const seconds = Math.floor(ms / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-
-    function getDateKey(timestamp) {
-      const date = new Date(timestamp);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    }
-
-    function getHourKey(timestamp) {
-      return new Date(timestamp).getHours();
-    }
-
-    function hourLabel(hourKey) {
-      const h = String(hourKey).padStart(2, '0');
-      return `${h}:00`;
-    }
-
-    function cleanupEmptyBuckets() {
-      for (const [dateKey, day] of Object.entries(state.days)) {
-        if (!day.hours) { delete state.days[dateKey]; continue; }
-        for (const [hourKey, hour] of Object.entries(day.hours)) {
-          if (!hour.locations || hour.locations.length === 0) delete day.hours[hourKey];
-        }
-        if (!day.hours || Object.keys(day.hours).length === 0) delete state.days[dateKey];
-      }
-    }
-
-    function countAllLocations() {
-      let total = 0;
-      Object.values(state.days).forEach(day => {
-        Object.values(day.hours || {}).forEach(hour => {
-          total += (hour.locations || []).length;
-        });
+      el('toggleBtn').addEventListener('click',()=>state.isRunning?stopTracking():startTracking());
+      el('captureBtn').addEventListener('click',()=>capture('history'));
+      el('favoriteBtn').addEventListener('click',()=>capture('favorite'));
+      el('centerBtn').addEventListener('click',()=>renderMap(true));
+      el('dateSelector').addEventListener('change',(e)=>{state.mapSelectedDate=e.target.value;state.mapSelectedHour='all';renderFilters();store();renderMap(true);});
+      el('hourSelector').addEventListener('change',(e)=>{state.mapSelectedHour=e.target.value;store();renderMap(true);});
+      el('favoritesOnMap').addEventListener('change',(e)=>{state.showFavorites=e.target.checked;store();renderMap(true);});
+      el('cycleDurationInput').value=String(Math.round(state.cycleDuration/1000));
+      el('cycleDurationInput').addEventListener('change',(e)=>{
+        const v=Number(e.target.value);
+        if(!Number.isFinite(v)||v<30||v>86400){e.target.value=Math.round(state.cycleDuration/1000);setDiagnostic('El intervalo debe estar entre 30 y 86.400 segundos.');return;}
+        state.cycleDuration=Math.round(v)*1000;if(state.isRunning)nextCaptureAt=Date.now()+state.cycleDuration;
+        store();renderStatus();
       });
-      return total;
-    }
-
-    // =========================
-    // PERMISOS / GEO
-    // =========================
-    async function getGeoPermissionState() {
-      if (!navigator.permissions || !navigator.permissions.query) return 'unknown';
-      try {
-        const res = await navigator.permissions.query({ name: 'geolocation' });
-        return res.state;
-      } catch {
-        return 'unknown';
-      }
-    }
-
-    function isSecureContextForGeo() {
-      return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    }
-
-    async function showPermissionDiagnostic() {
-      const perm = await getGeoPermissionState();
-      const secure = isSecureContextForGeo();
-      updateDiag(`Permiso geolocalización: ${perm} | Contexto seguro: ${secure ? 'sí' : 'no'}`);
-    }
-
-    function getLocationOnce(options) {
-      return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) return reject(new Error('Geolocalización no soportada'));
-
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            timestamp: Date.now(),
-          }),
-          (err) => {
-            let message = 'Error desconocido';
-            if (err && typeof err.code === 'number') {
-              if (err.code === err.PERMISSION_DENIED) message = 'Permiso denegado';
-              else if (err.code === err.POSITION_UNAVAILABLE) message = 'Ubicación no disponible';
-              else if (err.code === err.TIMEOUT) message = 'Tiempo agotado';
-            }
-            reject(new Error(message));
-          },
-          options
-        );
+      el('autoStartToggle').addEventListener('change',(e)=>{if(e.target.checked){startTracking();}else{stopTracking();}});
+      el('darkModeToggle').checked=state.darkMode;
+      document.body.classList.toggle('dark-mode',state.darkMode);
+      el('darkModeToggle').addEventListener('change',(e)=>{state.darkMode=e.target.checked;document.body.classList.toggle('dark-mode',state.darkMode);store();});
+      el('exportBtn').addEventListener('click',exportData);
+      el('importFile').addEventListener('change',async(e)=>{
+        const file=e.target.files&&e.target.files[0];if(!file)return;
+        try {await importText(await file.text(),/\.json$/i.test(file.name));}
+        catch(err){el('importStatus').textContent='No se pudo importar: '+err.message;setDiagnostic('El archivo no tiene un formato válido.');}
+        e.target.value='';
       });
-    }
-
-    async function getLocationRobust() {
-      const perm = await getGeoPermissionState();
-
-      if (!isSecureContextForGeo()) {
-        throw new Error('Geolocalización bloqueada: usa https o localhost');
-      }
-      if (perm === 'denied') {
-        throw new Error('Permiso denegado: habilita ubicación en el navegador');
-      }
-
-      try {
-        return await getLocationOnce({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-      } catch {
-        return await getLocationOnce({ enableHighAccuracy: false, timeout: 25000, maximumAge: 10000 });
-      }
-    }
-
-    // =========================
-    // ALMACENAMIENTO DE UBICACIÓN
-    // =========================
-    function addLocationToStorage(location) {
-      const dateKey = getDateKey(location.timestamp);
-      const hourKey = getHourKey(location.timestamp);
-
-      if (!state.days[dateKey]) state.days[dateKey] = { date: dateKey, hours: {} };
-      if (!state.days[dateKey].hours[hourKey]) state.days[dateKey].hours[hourKey] = { hour: hourKey, locations: [] };
-
-      state.days[dateKey].hours[hourKey].locations.push(location);
-      state.lastLocation = location;
-
-      state.cyclesCompleted = countAllLocations();
-
-      saveState();
-    }
-
-    // =========================
-    // FAVORITOS
-    // =========================
-    function addToFavorites(lat, lng, label, accuracy = null, timestamp = null) {
-      state.favorites.push({
-        latitude: lat,
-        longitude: lng,
-        label: label || new Date().toLocaleString('es-ES'),
-        accuracy: (typeof accuracy === 'number') ? accuracy : null,
-        timestamp: timestamp || Date.now(),
+      el('csvUrl').value=state.csvUrl;
+      el('csvUrl').addEventListener('change',(e)=>{state.csvUrl=e.target.value.trim();store();});
+      el('syncCsvBtn').addEventListener('click',async()=>{
+        const url=el('csvUrl').value.trim();if(!/^https:\/\//i.test(url)){setDiagnostic('Se requiere una URL HTTPS de un CSV accesible.');return;}
+        state.csvUrl=url;store();el('syncCsvBtn').disabled=true;setDiagnostic('Descargando CSV…');
+        try {
+          const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
+          try {const response=await fetch(url,{signal:controller.signal,credentials:'omit'});if(!response.ok)throw new Error('HTTP '+response.status);await importText(await response.text(),false);}
+          finally {clearTimeout(timer);}
+        } catch(err){setDiagnostic('No se pudo acceder al CSV. Comprueba permisos públicos, CORS y la URL; alternativamente, impórtalo como archivo.');}
+        finally {el('syncCsvBtn').disabled=false;}
       });
-      saveState();
-      updateFavoritesList();
-      updateDiag(`Favorito guardado: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-    }
-
-    function deleteFavorite(idx) {
-      state.favorites.splice(idx, 1);
-      saveState();
-      updateFavoritesList();
-      updateDiag('Favorito eliminado');
-    }
-
-    // =========================
-    // CICLO GPS
-    // =========================
-    let cycleInterval = null;
-    let gpsTimeout = null;
-    let cycleStartTime = null;
-
-    async function registerLocationNow() {
-      state.isGPSActive = true;
-      updateUI();
-
-      try {
-        const location = await getLocationRobust();
-        addLocationToStorage(location);
-
-        updateDateSelector();
-        updateHourSelector();
-        updateRecordsList();
-        updateFavoritesList();
-        if (state.configOpen && state.lastFullTab === 'mapTab') updateMap();
-
-        updateDiag(`OK: ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`);
-      } catch (error) {
-        state.lastError = error?.message || String(error);
-        updateDiag(`ERROR: ${state.lastError}`);
-      } finally {
-        if (gpsTimeout) clearTimeout(gpsTimeout);
-        gpsTimeout = setTimeout(() => {
-          state.isGPSActive = false;
-          updateUI();
-        }, state.gpsActiveDuration);
-      }
-    }
-
-    async function registerFavoriteNow() {
-      state.isGPSActive = true;
-      updateUI();
-
-      try {
-        const location = await getLocationRobust();
-        state.lastLocation = location;
-        saveState();
-
-        addToFavorites(
-          location.latitude,
-          location.longitude,
-          new Date(location.timestamp).toLocaleString('es-ES'),
-          location.accuracy,
-          location.timestamp
-        );
-      } catch (error) {
-        state.lastError = error?.message || String(error);
-        updateDiag(`ERROR: ${state.lastError}`);
-      } finally {
-        if (gpsTimeout) clearTimeout(gpsTimeout);
-        gpsTimeout = setTimeout(() => {
-          state.isGPSActive = false;
-          updateUI();
-        }, state.gpsActiveDuration);
-      }
-    }
-
-    function startCycle() {
-      if (state.isRunning) return;
-      state.isRunning = true;
-      cycleStartTime = Date.now();
-      state.timeRemaining = state.cycleDuration;
-
-      registerLocationNow();
-
-      cycleInterval = setInterval(() => {
-        const elapsed = Date.now() - cycleStartTime;
-        state.timeRemaining = Math.max(0, state.cycleDuration - elapsed);
-
-        if (state.timeRemaining === 0) {
-          cycleStartTime = Date.now();
-          state.timeRemaining = state.cycleDuration;
-          registerLocationNow();
-        }
-        updateUI();
-      }, 1000);
-
-      updateUI();
-    }
-
-    function stopCycle() {
-      if (cycleInterval) clearInterval(cycleInterval);
-      if (gpsTimeout) clearTimeout(gpsTimeout);
-
-      cycleInterval = null;
-      gpsTimeout = null;
-      cycleStartTime = null;
-
-      state.isRunning = false;
-      state.isGPSActive = false;
-      state.timeRemaining = state.cycleDuration;
-
-      updateUI();
-    }
-
-    // =========================
-    // UI (diagnóstico, tema, modal, tabs)
-    // =========================
-    function updateDiag(text) {
-      state.lastDiag = text;
-      const el = document.getElementById('diagText');
-      if (el) el.textContent = text || '—';
-      saveState();
-    }
-
-    function applyDarkMode(isDark) {
-      state.darkMode = !!isDark;
-      document.body.classList.toggle('dark-mode', state.darkMode);
-
-      const t = document.getElementById('darkModeToggle');
-      const l = document.getElementById('darkModeLabel');
-      if (t) t.checked = state.darkMode;
-      if (l) l.textContent = state.darkMode ? 'Habilitado' : 'Deshabilitado';
-
-      saveState();
-    }
-
-    function openConfigModal() {
-      if (state.isMinimized) return; // si está minimizado, no abrir modal
-
-      // Si NO está desbloqueado, abrir mini modal y salir
-      if (!isConfigUnlocked()) {
-        openPasswordModal();
-        return;
-      }
-
-      state.configOpen = true;
-
-      const modal = document.getElementById('configModal');
-      modal.classList.add('open');
-      modal.setAttribute('aria-hidden', 'false');
-
-      // activar última pestaña
-      activateTab(state.lastFullTab || 'calculator');
-
-      // si entra directo a mapa, invalida tamaño
-      if ((state.lastFullTab || 'calculator') === 'mapTab') {
-        setTimeout(() => {
-          initMap();
-          if (state.map) state.map.invalidateSize(true);
-          updateMap();
-        }, 180);
-      }
-
-      updateUI();
-    }
-
-    function closeConfigModal() {
-      state.configOpen = false;
-
-      const modal = document.getElementById('configModal');
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-
-      updateUI();
-    }
-
-    function updateUI() {
-      // Si está minimizado, ocultar todo y cerrar modal(s)
-      const pixelMinimizer = document.getElementById('pixelMinimizer');
-      const container = document.querySelector('.container');
-      const modal = document.getElementById('configModal');
-      const passModal = document.getElementById('passwordModal');
-
-      if (state.isMinimized) {
-        if (container) container.style.display = 'none';
-        if (pixelMinimizer) pixelMinimizer.classList.add('expanded');
-
-        if (passModal && passModal.classList.contains('open')) closePasswordModal();
-        if (modal && modal.classList.contains('open')) closeConfigModal();
-      } else {
-        if (container) container.style.display = 'flex';
-        if (pixelMinimizer) pixelMinimizer.classList.remove('expanded');
-      }
-
-      // GPS UI (existe dentro del modal siempre, aunque esté oculto)
-      const statusEl = document.getElementById('status');
-      const timerEl = document.getElementById('timer');
-      const cyclesEl = document.getElementById('cycles');
-      const intervalEl = document.getElementById('interval');
-      const gpsEl = document.getElementById('gpsActive');
-      const dmEl = document.getElementById('discreteMode');
-      const dmLabel = document.getElementById('discreteModeLabel');
-      const startBtn = document.getElementById('startBtn');
-
-      if (statusEl) {
-        statusEl.textContent = state.isRunning ? 'SISTEMA ACTIVO' : 'SISTEMA INACTIVO';
-        statusEl.style.color = state.isRunning ? '#22C55E' : '#EF4444';
-      }
-      if (timerEl) timerEl.textContent = formatTime(state.timeRemaining);
-      if (cyclesEl) cyclesEl.textContent = state.cyclesCompleted;
-      if (intervalEl) intervalEl.textContent = formatTime(state.cycleDuration);
-      if (gpsEl) gpsEl.textContent = formatTime(state.gpsActiveDuration);
-
-      const dmText = state.discreteMode ? 'Habilitado' : 'Deshabilitado';
-      if (dmEl) {
-        dmEl.textContent = dmText;
-        dmEl.style.color = state.discreteMode ? '#22C55E' : '#EF4444';
-      }
-      if (dmLabel) dmLabel.textContent = dmText;
-
-      const dmToggle = document.getElementById('discreteModeToggle');
-      if (dmToggle) dmToggle.checked = state.discreteMode;
-
-      if (startBtn) {
-        startBtn.textContent = state.isRunning ? 'Detener' : 'Iniciar';
-        startBtn.style.background = state.isRunning ? '#EF4444' : '#0a7ea4';
-      }
-    }
-
-    function activateTab(tabId) {
-      const modal = document.getElementById('configModal');
-      if (!modal) return;
-
-      modal.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-      modal.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-
-      const btn = modal.querySelector(`.tab-button[data-tab="${tabId}"]`);
-      if (btn) btn.classList.add('active');
-
-      const panel = document.getElementById(tabId);
-      if (panel) panel.classList.add('active');
-
-      state.lastFullTab = tabId;
-      saveState();
-
-      if (tabId === 'mapTab') {
-        setTimeout(() => {
-          initMap();
-          if (state.map) state.map.invalidateSize(true);
-          updateMap();
-        }, 180);
-      } else if (tabId === 'records') updateRecordsList();
-      else if (tabId === 'favorites') updateFavoritesList();
-      else if (tabId === 'settings') {
-        // refrescar valores inputs al entrar
-        const cd = document.getElementById('cycleDurationInput');
-        const gd = document.getElementById('gpsActiveDurationInput');
-        if (cd) cd.value = Math.round(state.cycleDuration / 1000);
-        if (gd) gd.value = Math.round(state.gpsActiveDuration / 1000);
-      }
-    }
-
-    // =========================
-    // MAPA
-    // =========================
-    function initMap() {
-      if (state.map) return;
-
-      let initialCenter = [19.4326, -99.1332];
-      let initialZoom = 13;
-
-      if (state.mapView && Array.isArray(state.mapView.center) && typeof state.mapView.zoom === 'number') {
-        initialCenter = state.mapView.center;
-        initialZoom = state.mapView.zoom;
-      } else if (state.lastLocation) {
-        initialCenter = [state.lastLocation.latitude, state.lastLocation.longitude];
-        initialZoom = 15;
-      }
-
-      state.map = L.map('leafletMap').setView(initialCenter, initialZoom);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(state.map);
-
-      state.map.on('moveend', () => {
-        const c = state.map.getCenter();
-        state.mapView = { center: [c.lat, c.lng], zoom: state.map.getZoom() };
-        saveState();
+      el('clearBtn').addEventListener('click',()=>{
+        if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
+        state.days={};state.favorites=[];state.lastLocation=null;state.mapSelectedDate='all';state.mapSelectedHour='all';
+        store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
-    }
-
-    function updateMap() {
-      if (!state.map) initMap();
-
-      state.markers.forEach(m => state.map.removeLayer(m));
-      state.markers = [];
-      if (state.polyline) state.map.removeLayer(state.polyline);
-      state.polyline = null;
-
-      const dateSel = document.getElementById('dateSelector');
-      const hourSel = document.getElementById('hourSelector');
-
-      const selectedDate = dateSel ? dateSel.value : '';
-      const selectedHour = hourSel ? hourSel.value : '';
-
-      if (!selectedDate || !state.days[selectedDate]) return;
-
-      let locations = [];
-      const dayData = state.days[selectedDate];
-
-      if (selectedHour && selectedHour !== 'all') {
-        const hourData = dayData.hours?.[selectedHour];
-        if (hourData?.locations?.length) locations = [...hourData.locations];
-      } else {
-        Object.values(dayData.hours || {}).forEach(h => locations.push(...(h.locations || [])));
-      }
-
-      locations.sort((a,b) => a.timestamp - b.timestamp);
-      if (locations.length === 0) return;
-
-      const coords = locations.map(l => [l.latitude, l.longitude]);
-      state.polyline = L.polyline(coords, { color:'#0a7ea4', weight:3 }).addTo(state.map);
-
-      locations.forEach((loc, idx) => {
-        const isFirst = idx === 0;
-        const isLast = idx === locations.length - 1;
-        const color = isFirst ? '#22C55E' : isLast ? '#EF4444' : '#0a7ea4';
-
-        const marker = L.circleMarker([loc.latitude, loc.longitude], {
-          radius: 8, fillColor: color, color: color, weight: 2, opacity: 1, fillOpacity: .85
-        }).bindPopup(`
-          <strong>Punto ${idx + 1}</strong><br>
-          ${new Date(loc.timestamp).toLocaleTimeString('es-ES')}<br>
-          ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}<br>
-          <a href="https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}" target="_blank" rel="noopener">Abrir en Maps</a>
-        `).addTo(state.map);
-
-        state.markers.push(marker);
-      });
-
-      state.map.fitBounds(L.latLngBounds(coords), { padding:[50,50] });
-    }
-
-    function updateDateSelector() {
-      cleanupEmptyBuckets();
-
-      const selector = document.getElementById('dateSelector');
-      if (!selector) return;
-
-      const dates = Object.keys(state.days).sort().reverse();
-      selector.innerHTML = '';
-
-      if (dates.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '— sin datos —';
-        selector.appendChild(opt);
-        state.mapSelectedDate = '';
-        saveState();
-        return;
-      }
-
-      dates.forEach(date => {
-        const option = document.createElement('option');
-        option.value = date;
-        const dayCount = Object.values(state.days[date].hours || {}).reduce((sum, h) => sum + (h.locations?.length || 0), 0);
-        option.textContent = `${date} (${dayCount} puntos)`;
-        selector.appendChild(option);
-      });
-
-      const wanted = state.mapSelectedDate;
-      selector.value = (wanted && state.days[wanted]) ? wanted : dates[0];
-
-      state.mapSelectedDate = selector.value;
-      saveState();
-    }
-
-    function updateHourSelector() {
-      const dateSel = document.getElementById('dateSelector');
-      const hourSel = document.getElementById('hourSelector');
-      if (!dateSel || !hourSel) return;
-
-      const selectedDate = dateSel.value;
-      hourSel.innerHTML = '';
-
-      if (!selectedDate || !state.days[selectedDate]) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '— hora —';
-        hourSel.appendChild(opt);
-        state.mapSelectedHour = '';
-        saveState();
-        return;
-      }
-
-      const hoursObj = state.days[selectedDate].hours || {};
-      const hours = Object.keys(hoursObj).sort((a,b) => Number(b) - Number(a));
-
-      const optAll = document.createElement('option');
-      optAll.value = 'all';
-      optAll.textContent = 'Todas las horas';
-      hourSel.appendChild(optAll);
-
-      hours.forEach(h => {
-        const option = document.createElement('option');
-        option.value = h;
-        const count = (hoursObj[h].locations || []).length;
-        option.textContent = `${hourLabel(h)} (${count})`;
-        hourSel.appendChild(option);
-      });
-
-      const wanted = state.mapSelectedHour;
-      const canUseWanted = wanted && (wanted === 'all' || hoursObj[wanted]);
-      if (canUseWanted) hourSel.value = wanted;
-      else hourSel.value = hours.length ? hours[0] : 'all';
-
-      state.mapSelectedHour = hourSel.value;
-      saveState();
-    }
-
-    // =========================
-    // REGISTROS
-    // =========================
-    function openMaps(lat, lng) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank', 'noopener');
-    }
-
-    function deleteLocation(timestamp) {
-      for (const day of Object.values(state.days)) {
-        for (const hour of Object.values(day.hours || {})) {
-          hour.locations = (hour.locations || []).filter(l => l.timestamp !== timestamp);
-        }
-      }
-
-      cleanupEmptyBuckets();
-      state.cyclesCompleted = countAllLocations();
-      saveState();
-
-      updateRecordsList();
-      updateDateSelector();
-      updateHourSelector();
-      if (state.configOpen && state.lastFullTab === 'mapTab') updateMap();
-
-      updateUI();
-      updateDiag('Registro eliminado');
-    }
-
-    function updateRecordsList() {
-      const recordsList = document.getElementById('recordsList');
-      if (!recordsList) return;
-
-      cleanupEmptyBuckets();
-
-      const dates = Object.keys(state.days).sort().reverse();
-      if (dates.length === 0) {
-        recordsList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📍</div><p>Sin registros</p></div>';
-        return;
-      }
-
-      let html = '';
-      dates.forEach(dateKey => {
-        const day = state.days[dateKey];
-        const dayCount = Object.values(day.hours || {}).reduce((sum, h) => sum + (h.locations?.length || 0), 0);
-
-        html += `
-          <details class="record-date-group" open>
-            <summary class="record-date-header">
-              <span>📅 ${dateKey}</span>
-              <span style="display:flex;align-items:center;gap:8px;">
-                <span>${dayCount} punto(s)</span>
-                <span class="collapse-icon">▾</span>
-              </span>
-            </summary>
-        `;
-
-        const hours = Object.keys(day.hours || {}).sort((a,b) => Number(b) - Number(a));
-        hours.forEach(hourKey => {
-          const hourData = day.hours[hourKey];
-          const locs = [...(hourData.locations || [])].sort((a,b) => b.timestamp - a.timestamp);
-
-          html += `
-            <details class="record-hour-group" open>
-              <summary class="record-hour-header">
-                <span>🕒 ${hourLabel(hourKey)}</span>
-                <span style="display:flex;align-items:center;gap:8px;">
-                  <span>${locs.length}</span>
-                  <span class="collapse-icon">▾</span>
-                </span>
-              </summary>
-          `;
-
-          html += locs.map((loc) => `
-            <div class="record-item">
-              <div class="record-info">
-                <div class="record-time">${new Date(loc.timestamp).toLocaleString('es-ES')}</div>
-                <div class="record-coords">${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)} (±${Math.round(loc.accuracy || 0)}m)</div>
-              </div>
-              <div class="record-actions">
-                <button class="btn-small btn-maps" onclick="openMaps(${loc.latitude}, ${loc.longitude})">Maps</button>
-                <button class="btn-small btn-favorite" onclick="addToFavorites(${loc.latitude}, ${loc.longitude}, '${new Date(loc.timestamp).toLocaleString('es-ES')}')">★</button>
-                <button class="btn-small btn-delete" onclick="deleteLocation(${loc.timestamp})">✕</button>
-              </div>
-            </div>
-          `).join('');
-
-          html += `</details>`;
-        });
-
-        html += `</details>`;
-      });
-
-      recordsList.innerHTML = html;
-    }
-
-    // =========================
-    // FAVORITOS
-    // =========================
-    function updateFavoritesList() {
-      const favoritesList = document.getElementById('favoritesList');
-      if (!favoritesList) return;
-
-      if (!state.favorites || state.favorites.length === 0) {
-        favoritesList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⭐</div><p>Sin favoritos</p></div>';
-        return;
-      }
-
-      const sorted = [...state.favorites].sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
-      const groups = {};
-      sorted.forEach(f => {
-        const t = f.timestamp || Date.now();
-        const dk = getDateKey(t);
-        if (!groups[dk]) groups[dk] = [];
-        groups[dk].push(f);
-      });
-
-      const groupDates = Object.keys(groups).sort().reverse();
-      let html = '';
-
-      groupDates.forEach(dateKey => {
-        const items = groups[dateKey] || [];
-        html += `
-          <details class="record-date-group" open>
-            <summary class="record-date-header">
-              <span>⭐ ${dateKey}</span>
-              <span style="display:flex;align-items:center;gap:8px;">
-                <span>${items.length} favorito(s)</span>
-                <span class="collapse-icon">▾</span>
-              </span>
-            </summary>
-        `;
-
-        html += items.map((fav) => {
-          const idx = state.favorites.indexOf(fav);
-          const acc = (typeof fav.accuracy === 'number') ? ` (±${Math.round(fav.accuracy)}m)` : '';
-          return `
-            <div class="favorite-item">
-              <div class="favorite-label">⭐ ${fav.label || ''}</div>
-              <div class="record-coords">${Number(fav.latitude).toFixed(6)}, ${Number(fav.longitude).toFixed(6)}${acc}</div>
-              <div class="record-actions" style="margin-top:12px;">
-                <button class="btn-small btn-maps" onclick="openMaps(${fav.latitude}, ${fav.longitude})">Maps</button>
-                <button class="btn-small btn-delete" onclick="deleteFavorite(${idx})">Eliminar</button>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        html += `</details>`;
-      });
-
-      favoritesList.innerHTML = html;
-    }
-
-    // =========================
-    // EVENTOS (CALC + MODAL + SETTINGS)
-    // =========================
-
-    // Números (incluye +/- corregido)
-    document.querySelectorAll('.calc-btn-number').forEach(button => {
-      button.addEventListener('click', () => {
-        const digit = button.textContent;
-        if (digit >= '0' && digit <= '9') inputDigit(digit);
-        else if (digit === '.') inputDecimal();
-        else if (digit === '+/-') handleSpecialOperation('plusMinus');
-      });
-    });
-
-    // Operadores
-    document.querySelectorAll('.calc-btn-operator').forEach(button => {
-      button.addEventListener('click', () => {
-        const op = button.textContent;
-        if (op === '+' || op === '-' || op === '*' || op === '/') handleOperator(op);
-        else if (op === '%') handleSpecialOperation('percent');
-        else if (op === 'CE') handleSpecialOperation('clearEntry');
-        else if (op === 'C') handleSpecialOperation('clear');
-        else if (op === '1/x') handleSpecialOperation('reciprocal');
-        else if (op === 'x²') handleSpecialOperation('square');
-        else if (op === '√') handleSpecialOperation('sqrt');
-      });
-    });
-
-    // Memoria (sin funcionalidad)
-    document.querySelectorAll('.calc-btn-memory').forEach(button => {
-      button.addEventListener('click', () => {});
-    });
-
-    document.querySelector('.calc-btn-equals').addEventListener('click', calculate);
-
-    // Abrir Config: si no está desbloqueado -> mini modal
-    document.getElementById('configBtn').addEventListener('click', () => {
-      if (state.isMinimized) return;
-      if (isConfigUnlocked()) openConfigModal();
-      else openPasswordModal();
-    });
-
-    // ===== Eventos mini modal contraseña =====
-    document.getElementById('passwordSubmitBtn').addEventListener('click', submitPassword);
-    document.getElementById('passwordCancelBtn').addEventListener('click', closePasswordModal);
-    document.getElementById('passwordModalCloseBtn').addEventListener('click', closePasswordModal);
-
-    // Cerrar mini modal al tocar el fondo
-    document.getElementById('passwordModal').addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'passwordModal') closePasswordModal();
-    });
-
-    // Enter en input para enviar
-    document.getElementById('passwordInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') submitPassword();
-      if (e.key === 'Escape') closePasswordModal();
-    });
-
-    // Cerrar modal (botones)
-    document.getElementById('closeConfigBtn').addEventListener('click', closeConfigModal);
-    document.getElementById('configModalCloseBtn').addEventListener('click', closeConfigModal);
-
-    // Cerrar al tocar el fondo
-    document.getElementById('configModal').addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'configModal') closeConfigModal();
-    });
-
-    // ESC para cerrar (prioridad: mini modal)
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        const pass = document.getElementById('passwordModal');
-        if (pass && pass.classList.contains('open')) { closePasswordModal(); return; }
-
-        const modal = document.getElementById('configModal');
-        if (modal.classList.contains('open')) closeConfigModal();
-      }
-    });
-
-    // Tabs del modal
-    document.querySelectorAll('#configModal .tab-button').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const tabId = e.target.dataset.tab;
-        activateTab(tabId);
-      });
-    });
-
-    // Botones GPS
-    document.getElementById('startBtn').addEventListener('click', () => {
-      state.isRunning ? stopCycle() : startCycle();
-    });
-
-    document.getElementById('manualBtn').addEventListener('click', registerFavoriteNow);
-    document.getElementById('manualBtnMap').addEventListener('click', registerFavoriteNow);
-    document.getElementById('permBtn').addEventListener('click', showPermissionDiagnostic);
-
-    // Inputs settings
-    document.getElementById('cycleDurationInput').addEventListener('change', (e) => {
-      const v = Math.max(10, parseInt(e.target.value || '600', 10));
-      state.cycleDuration = v * 1000;
-      state.timeRemaining = state.cycleDuration;
-      saveState();
-      updateUI();
-    });
-
-    document.getElementById('gpsActiveDurationInput').addEventListener('change', (e) => {
-      const v = Math.max(5, parseInt(e.target.value || '60', 10));
-      state.gpsActiveDuration = v * 1000;
-      saveState();
-      updateUI();
-    });
-
-    document.getElementById('discreteModeToggle').addEventListener('change', (e) => {
-      state.discreteMode = e.target.checked;
-      if (state.discreteMode) state.isMinimized = true;
-      saveState();
-      updateUI();
-    });
-
-    document.getElementById('darkModeToggle').addEventListener('change', (e) => {
-      applyDarkMode(e.target.checked);
-    });
-
-    // Mapa filtros
-    document.getElementById('refreshMapBtn').addEventListener('click', updateMap);
-
-    document.getElementById('dateSelector').addEventListener('change', (e) => {
-      state.mapSelectedDate = e.target.value || '';
-      saveState();
-      updateHourSelector();
-      updateMap();
-    });
-
-    document.getElementById('hourSelector').addEventListener('change', (e) => {
-      state.mapSelectedHour = e.target.value || '';
-      saveState();
-      updateMap();
-    });
-
-    // Exportar
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const data = JSON.stringify({
-        cyclesCompleted: state.cyclesCompleted,
-        days: state.days,
-        favorites: state.favorites,
-        exportDate: new Date().toISOString(),
-      }, null, 2);
-
-      const blob = new Blob([data], { type:'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gps-data-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      updateDiag('Exportación generada');
-    });
-
-    // Limpiar
-    document.getElementById('clearBtn').addEventListener('click', () => {
-      state.days = {};
-      state.lastLocation = null;
-      state.favorites = [];
-      state.lastError = null;
-
-      cleanupEmptyBuckets();
-      state.cyclesCompleted = 0;
-
-      state.mapSelectedDate = '';
-      state.mapSelectedHour = '';
-
-      saveState();
-
-      updateRecordsList();
-      updateDateSelector();
-      updateHourSelector();
-      updateFavoritesList();
-      updateUI();
-
-      updateDiag('Datos eliminados');
-    });
-
-    // Pixel minimizador
-    document.getElementById('pixelMinimizer').addEventListener('click', () => {
-      state.isMinimized = !state.isMinimized;
-      // Si desminimiza, no forzamos abrir modal
-      saveState();
-      updateUI();
-    });
-
-    // =========================
-    // INICIALIZACIÓN
-    // =========================
-    loadState();
-
-    // tema inicial
-    if (!localStorage.getItem('gpsTrackerState')) {
-      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      applyDarkMode(prefersDark);
-    } else {
-      applyDarkMode(state.darkMode);
-    }
-
-    // inicializar calc
-    updateCalcDisplay();
-
-    // inicializar selects/listas (funcionan aunque el modal esté cerrado porque existen en DOM)
-    updateDateSelector();
-    updateHourSelector();
-    updateRecordsList();
-    updateFavoritesList();
-
-    // UI estado
-    updateUI();
-
-    (async () => {
-      const perm = await getGeoPermissionState();
-      updateDiag(`Permiso inicial: ${perm} | Seguro: ${isSecureContextForGeo() ? 'sí' : 'no'}`);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();if(!document.hidden&&map)map.invalidateSize();});
+      window.addEventListener('online',()=>{if(map)map.invalidateSize();});
+      renderAll(true);
+      if(state.autoStart) startTracking();
+      else setDiagnostic('Seguimiento detenido. Pulsa Iniciar seguimiento para capturar nuevas ubicaciones.');
     })();
   </script>
 </body>
