@@ -63,25 +63,17 @@
     .location-distance-copy{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;font-size:12px;min-width:0;color:var(--muted)}
     .location-distance-copy strong{font-size:18px;color:var(--positive);font-weight:850;font-variant-numeric:tabular-nums}
     .location-distance-copy span{font-size:11px}
-    .location-actionbar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px 18px;justify-content:space-between;background:color-mix(in srgb,var(--bg) 60%,var(--panel));border-top:1px solid var(--line);padding:12px 18px}
-    .location-primary,.location-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0}
-    .location-tools{margin-left:auto}
-    .location-action{min-height:39px;padding:8px 11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:10px;color:var(--ink);text-decoration:none;font-size:12px;line-height:1.2;font-weight:800;cursor:pointer;white-space:nowrap}
+    .location-actionbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;background:color-mix(in srgb,var(--bg) 60%,var(--panel));border-top:1px solid var(--line);padding:12px 18px}
+    .location-primary,.location-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px;min-width:0;width:100%}
+    .location-tools{border-top:1px solid var(--line);padding-top:10px}
+    .location-action{width:100%;min-height:40px;padding:8px 11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:10px;color:var(--ink);text-decoration:none;font-size:12px;line-height:1.2;font-weight:800;cursor:pointer;white-space:nowrap}
     .location-action:hover{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 5%,var(--panel));color:var(--brand2)}
-    .location-action:focus-visible,.group>summary:focus-visible,.subgroup>summary:focus-visible,.location-more summary:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+    .location-action:focus-visible,.group>summary:focus-visible,.subgroup>summary:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
     .location-action-primary{background:var(--brand2);border-color:var(--brand2);color:#fff}
     .location-action-primary:hover{background:var(--brand2);color:#fff;filter:brightness(1.08)}
     .location-action .ui-svg{width:16px;height:16px}
     .location-action-danger{color:var(--negative);border-color:color-mix(in srgb,var(--negative) 25%,var(--line))}
     .location-action-danger:hover{background:color-mix(in srgb,var(--negative) 8%,var(--panel));color:var(--negative);border-color:var(--negative)}
-    .location-more{min-width:0}
-    .location-more>summary{list-style:none}
-    .location-more>summary::-webkit-details-marker{display:none}
-    .location-more[open]{flex:1 0 100%;order:10}
-    .location-more[open]>summary{width:max-content;margin-left:auto}
-    .location-more-grid{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;border-top:1px solid var(--line);padding:13px 0 1px;margin-top:10px}
-    .location-more-title{flex-basis:100%;font-size:10px;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:var(--muted);margin:0 0 1px}
-    .location-more[open] .location-more-chevron{transform:rotate(180deg)}
 
     /* Tonos alternos por registro. Fondo tenue + borde visible + franja lateral para
        distinguir las mediciones, sin sacrificar contraste o modo oscuro. */
@@ -800,39 +792,34 @@
         }
         card.append(meta);
         const bar=document.createElement('div');bar.className='location-actionbar';
+        const primary=document.createElement('div');primary.className='location-primary';
         const mapsLink=externalAction('Google Maps','external',mapLink(p));
         mapsLink.classList.add('location-action-primary');
-        bar.append(
+        primary.append(
           mapsLink,
           actionButton('Medir','measure',()=>measureFromHere(p)),
           actionButton('Copiar','copy',()=>copyLocation(p)),
           actionButton('Compartir','share',()=>shareLocation(p))
         );
-        const more=document.createElement('details');more.className='location-more';
-        const disclosure=document.createElement('summary');disclosure.className='location-action';
-        disclosure.append(uiIcon('more'),uiText('span','Opciones'));
-        const chevron=document.createElement('span');chevron.className='location-more-chevron';chevron.append(uiIcon('chevron'));
-        disclosure.append(chevron);more.append(disclosure);
-        const moreGrid=document.createElement('div');moreGrid.className='location-more-grid';
-        moreGrid.append(uiText('div','ADMINISTRAR ESTA UBICACIÓN','location-more-title'));
-        moreGrid.append(
+        const tools=document.createElement('div');tools.className='location-tools';
+        tools.append(
           actionButton('Editar dirección','edit',()=>editAddress(p)),
           actionButton('Buscar dirección','search',()=>lookupAddress(p))
         );
         if(!isFavorite&&!state.favorites.some(f=>valid(f)&&Number(f.timestamp)===Number(p.timestamp)&&Number(f.latitude)===Number(p.latitude)&&Number(f.longitude)===Number(p.longitude))){
-          moreGrid.append(actionButton('Añadir favorito','star',()=>{
+          tools.append(actionButton('Añadir favorito','star',()=>{
             state.favorites.push(Object.assign({},p,{label:fmtTime(p.timestamp)}));store();renderAll();
             setDiagnostic('Ubicación añadida a favoritos.');
           }));
         }
-        moreGrid.append(actionButton('Eliminar','trash',()=>{
+        tools.append(actionButton('Eliminar','trash',()=>{
           if(!confirm('¿Eliminar esta ubicación '+(isFavorite?'de favoritos':'del historial')+'?'))return;
           if(isFavorite){
             const idx=state.favorites.indexOf(p);
             if(idx>=0){state.favorites.splice(idx,1);store();renderAll();setDiagnostic('Favorito eliminado.');}
           }else{deleteLocation(p);setDiagnostic('Registro eliminado.');}
         },'location-action-danger'));
-        more.append(moreGrid);bar.append(more);card.append(bar);
+        bar.append(primary,tools);card.append(bar);
         return card;
       }
       function deleteLocation(p) {
