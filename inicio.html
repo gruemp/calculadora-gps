@@ -63,9 +63,8 @@
     .location-distance-copy{display:flex;gap:4px 12px;align-items:baseline;flex-wrap:wrap;font-size:12px;min-width:0;color:var(--muted)}
     .location-distance-copy strong{font-size:18px;color:var(--positive);font-weight:850;font-variant-numeric:tabular-nums}
     .location-distance-copy span{font-size:11px}
-    .location-actionbar{display:flex;flex-direction:column;align-items:stretch;gap:10px;background:color-mix(in srgb,var(--bg) 60%,var(--panel));border-top:1px solid var(--line);padding:12px 18px}
-    .location-primary,.location-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px;min-width:0;width:100%}
-    .location-tools{border-top:1px solid var(--line);padding-top:10px}
+
+
     .location-action{width:100%;min-height:40px;padding:8px 11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--panel);border-radius:10px;color:var(--ink);text-decoration:none;font-size:12px;line-height:1.2;font-weight:800;cursor:pointer;white-space:nowrap}
     .location-action:hover{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 5%,var(--panel));color:var(--brand2)}
     .location-action:focus-visible,.group>summary:focus-visible,.subgroup>summary:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
@@ -128,16 +127,13 @@
       .location-card-top{padding:16px 14px 12px;gap:10px}
       .location-info{padding:0 14px 13px 68px;gap:8px}
       .location-distance{margin:0 14px 14px 68px}
-      .location-actionbar{padding:12px;gap:10px}
-      .location-primary{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-      .location-primary .location-action{white-space:normal;text-align:center}
-      .location-tools{width:100%;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:7px}
-      .location-tools>.location-action,.location-tools>.location-more>summary{width:100%;min-width:0;padding:9px 4px;font-size:11px;gap:5px}
-      .location-tools .location-action .ui-svg{width:15px;height:15px}
-      .location-more[open]{grid-column:1/-1;width:100%}
-      .location-more[open]>summary{width:auto;margin-left:0}
-      .location-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-      .location-more-grid .location-action{white-space:normal}
+
+
+
+
+
+
+
     }
     @media(max-width:390px){
       .location-info{padding-left:14px}
@@ -225,19 +221,12 @@
     .location-distance-copy{gap:2px 6px;line-height:1.2;font-size:10px}
     .location-distance-copy strong{font-size:15px}
     .location-distance-copy span{font-size:10px}
-    .location-actionbar{
-      display:grid;
-      grid-template-columns:1.4fr repeat(4,minmax(0,1fr));
-      gap:5px;padding:7px 10px;align-items:start;
-    }
-    .location-actionbar>.location-action,.location-actionbar>.location-more>summary{width:100%}
+
     .location-action{min-height:40px;border-radius:8px;padding:7px 7px;gap:5px;font-size:11px;line-height:1.2;white-space:normal}
     .location-action .ui-svg{width:14px;height:14px}
-    .location-more{min-width:0}
-    .location-more[open]{grid-column:1/-1;order:unset}
-    .location-more[open]>summary{width:auto;margin-left:0}
-    .location-more-grid{padding:8px 0 0;margin-top:8px;gap:6px}
-    .location-more-title{font-size:9px}
+
+
+
     #favoritesList>.location-card{margin:0 0 8px}
     .settings{gap:10px}
     .setting-box{padding:12px}
@@ -260,13 +249,11 @@
       .location-card-top{padding:9px 10px 6px}
       .location-meta{grid-template-columns:1fr;padding:0 10px 8px 48px;gap:5px}
       .location-distance{justify-self:start}
-      .location-actionbar{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;padding:7px 9px}
-      .location-actionbar>.location-action-primary{grid-column:span 2}
-      .location-actionbar>.location-more{min-width:0;width:100%}
-      .location-more[open]{grid-column:1/-1;width:100%}
-      .location-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-      .location-more-grid>.location-action{white-space:normal}
-      .location-actionbar>.location-action,.location-actionbar>.location-more>summary{min-height:40px;font-size:11px;padding:6px 4px;gap:4px}
+
+
+
+
+
       .records-toolbar-heading span{display:none}
       .records-filter-row{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
       .records-filter-row .field{min-width:0}
@@ -288,13 +275,36 @@
       .location-pin{width:27px;height:27px;flex-basis:27px}
       .location-info-entry{font-size:10.5px}
       .location-distance{padding:5px 7px}
-      .location-actionbar{padding:6px 7px}
+
     }
-    /* Las acciones de cada ubicación ocupan todo el ancho en escritorio y móvil. */
-    .location-actionbar{display:flex;flex-direction:column;align-items:stretch;gap:10px}
-    .location-primary,.location-tools{display:grid;width:100%;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px}
-    .location-tools{margin:0;border-top:1px solid var(--line);padding-top:10px}
-    .location-primary .location-action,.location-tools .location-action{width:100%;min-width:0;white-space:normal;text-align:center}
+
+
+
+    /* Acciones visibles: una fila en escritorio y filas completas en tamaños menores. */
+    .location-actionbar{
+      display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;
+      gap:8px;padding:10px 12px;border-top:1px solid var(--line);
+      background:color-mix(in srgb,var(--bg) 60%,var(--panel));
+    }
+    .location-primary,.location-tools{
+      display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+      gap:8px;min-width:0;width:100%;
+    }
+    .location-tools{margin:0;padding:8px 0 0;border-top:1px solid var(--line)}
+    .location-primary .location-action,.location-tools .location-action{
+      width:100%;min-width:0;min-height:42px;margin:0;padding:8px 6px;
+      white-space:normal;text-align:center;line-height:1.25;
+    }
+    @media(min-width:1100px){
+      .location-actionbar{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}
+      .location-tools{border-top:0;border-left:1px solid var(--line);padding:0 0 0 12px}
+    }
+    @media(max-width:599px){
+      .location-actionbar{gap:8px;padding:8px}
+      .location-primary,.location-tools{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+      .location-tools>.location-action:last-child:nth-child(odd){grid-column:1/-1}
+      .location-primary .location-action,.location-tools .location-action{min-height:44px;font-size:11px}
+    }
   </style>
 </head>
 <body>
