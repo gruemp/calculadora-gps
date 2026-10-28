@@ -1,6 +1,10 @@
 # Integración pendiente: Apps Script y Google Sheets para Control GPS
 
-**Estado:** pendiente de configuración, autorización, implementación y pruebas. Este archivo no es una integración activa.
+**Estado (2026-10-27, America/Bogota):** cliente y backend implementados; 19 pruebas locales con servicios simulados superadas. Pendientes: acceso administrativo a Apps Script/Cloud, selección de hoja privada de ensayo, autorización OAuth, despliegue API ejecutable y pruebas reales entre dispositivos. **La sincronización remota no está activa.**
+
+La configuración exacta, el contrato de datos y las pruebas pendientes están en [apps-script/README.md](apps-script/README.md). No se han creado proyectos ni hojas, modificado LoNecesito ni autorizado cuentas de Google.
+
+Lo que sigue conserva el diagnóstico anterior como antecedente; las afirmaciones de ausencia de código se refieren al punto de partida.
 
 ## Punto de partida verificado
 

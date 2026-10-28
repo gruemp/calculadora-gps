@@ -26,7 +26,7 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 
 ## Limitaciones y privacidad
 
-- Las coordenadas se almacenan en el dispositivo mediante `localStorage`. No se envían automáticamente a Google Sheets.
+- Las coordenadas se almacenan en el dispositivo mediante `localStorage`. Solo se envían a Google Sheets después de configurar el servicio, consentir e iniciar una sesión autorizada.
 - El seguimiento GPS desde navegadores **no es fiable en segundo plano**: al suspender la pestaña, bloquear la pantalla o cerrar el navegador pueden perderse intervalos. Para registrar ubicaciones con la pantalla apagada de forma confiable hace falta una aplicación móvil con permisos apropiados.
 - Si faltan registros, comprueba los filtros, los permisos de GPS y el diagnóstico visible; también puedes importar CSV/JSON.
 - Ya no se cargan Leaflet ni las teselas de OpenStreetMap. Los enlaces externos a Google Maps requieren conexión.
@@ -49,7 +49,9 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 
 ## Apps Script y conexiones (última etapa)
 
-La integración con Google Apps Script/Google Sheets para leer direcciones, sincronizar registros entre dispositivos o almacenar automáticamente recorridos **no está activada**. Requiere validar la hoja y sus columnas, el protocolo existente de Apps Script, autorización de acceso, protección de datos y pruebas de sincronización. Hay una preparación detallada en [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) para retomar en ChatGPT Work. No publiques una hoja privada ni una URL sensible de Apps Script dentro de una página pública.
+Se implementaron el cliente de sincronización opcional, la cola persistente, el backend privado de Apps Script y la consulta de direcciones mediante Google autenticado. **El backend no está desplegado ni autorizado; no hay sincronización remota activa todavía.** Se conserva el modo local y todo el CSS existente. La nueva configuración está únicamente en Opciones y datos.
+
+La activación requiere un API ejecutable y un cliente OAuth del mismo proyecto estándar de Google Cloud, una hoja privada y pruebas reales. Consulta [apps-script/README.md](apps-script/README.md) para configurar y verificar la conexión. La suite local se ejecuta con `node --test tests/sync.test.cjs`; sus servicios Google son simulados. [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el seguimiento de pendientes.
 
 
 ## Desplazamiento libre

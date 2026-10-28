@@ -368,6 +368,22 @@
             <button class="btn" id="syncCsvBtn" type="button">Importar CSV de la URL</button>
           </div>
           <div class="setting-box">
+            <h3>Google Sheets privado (opcional)</h3>
+            <p>La conexión requiere un servicio autorizado. Envía historial, favoritos y direcciones a la hoja privada de tu cuenta. La copia local se conserva y se respalda antes de sincronizar. Los cambios de favoritos y direcciones se propagan; eliminar registros del historial sigue siendo solo local. Las versiones anteriores permanecen en la hoja.</p>
+            <details><summary>Configurar conexión de Google</summary>
+              <label class="field" for="googleClientId">ID de cliente OAuth<input id="googleClientId" type="text" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
+              <label class="field" for="googleDeploymentId">ID del despliegue API ejecutable<input id="googleDeploymentId" type="text" autocomplete="off" placeholder="ID de implementación, sin URL"></label>
+              <p>Usa los identificadores del servicio configurado por el propietario. No introduzcas contraseñas, claves privadas ni tokens.</p>
+            </details>
+            <label class="toggle-row"><input id="googleConsent" type="checkbox"> Autorizo sincronizar mis ubicaciones con la hoja privada</label>
+            <label class="toggle-row"><input id="googleAutoAddress" type="checkbox"> Consultar en Google la dirección aproximada de nuevas capturas (máximo una por minuto y 20 por sesión)</label>
+            <button class="btn" id="googleConnectBtn" type="button">Conectar con Google</button>
+            <button class="btn" id="googleSyncBtn" type="button">Sincronizar ahora</button>
+            <button class="btn" id="googleDisconnectBtn" type="button">Desconectar y revocar acceso</button>
+            <button class="btn" id="googleBackupBtn" type="button">Descargar copia anterior a la sincronización</button>
+            <p id="googleSyncStatus" role="status" aria-live="polite">Sincronización desactivada.</p>
+          </div>
+          <div class="setting-box">
             <h3>Direcciones postales (opcional)</h3><p>Sin fichas. Puedes escribir la dirección completa de cada punto o buscar una dirección aproximada con una clave propia de Geoapify, solicitada únicamente cuando pulses «Buscar dirección». Las coordenadas se envían al proveedor solo si lo autorizas.</p><label class="field" for="geoapifyKeyInput">Clave Geoapify (opcional)<input id="geoapifyKeyInput" type="password" autocomplete="off" placeholder="Clave restringida al dominio de la aplicación"></label><p>La clave se conserva solo en este navegador, no se exporta ni se incorpora a los mensajes compartidos. En aplicaciones web la clave es visible y debes restringirla por origen o referente en Geoapify.</p><button class="btn" id="saveGeoapifyBtn" type="button">Guardar configuración local</button><p>Geoapify devuelve direcciones aproximadas cuando existen; pueden faltar calles o números. Para una dirección exacta, introdúcela manualmente.</p>
           </div>
           <div class="setting-box">
@@ -375,11 +391,13 @@
             <button class="btn btn-danger" id="clearBtn" type="button">Borrar registros y favoritos</button>
           </div>
         </div>
-        <div class="hint">Privacidad: la geolocalización se guarda localmente en este dispositivo. Esta versión no envía automáticamente coordenadas a Google Sheets. El rastreo periódico en segundo plano no está garantizado si el navegador suspende la pestaña o la aplicación.</div>
+        <div class="hint">Privacidad: la geolocalización se guarda localmente en este dispositivo. Solo se envían coordenadas a Google Sheets si autorizas y conectas la sincronización privada. El rastreo periódico en segundo plano no está garantizado si el navegador suspende la pestaña o la aplicación.</div>
       </div>
     </section>
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
+  <script src="gps-sync.js"></script>
+  <script src="gps-google.js"></script>
   <script>
     (function () {
       'use strict';
@@ -421,6 +439,7 @@
         if(!state.addresses[k])state.addresses[k]={address:value.address.trim().slice(0,250),source:'manual (migrada)'};
       }}
       let nextCaptureAt = 0, ticker = null, captureBusy = false;
+      let cloud=null;
       function allLocations() {
         const result = [];
         Object.keys(state.days).forEach((dk) => {
@@ -446,7 +465,9 @@
             ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}),
             cyclesCompleted:allLocations().length
           }));
-        } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); }
+        } catch (e) { setDiagnostic('Almacenamiento lleno o bloqueado. Exporta tus datos para no perder cambios.'); return false; }
+        if(cloud)cloud.changed();
+        return true;
       }
       function setDiagnostic(message) { el('diagnostic').textContent=message; }
       function appendLocation(p) {
@@ -514,6 +535,7 @@
             setDiagnostic('Ubicación registrada: '+formatCoords(normalize(p))+' (precisión ±'+Math.round(p.accuracy || 0)+' m).');
           }
           store();renderAll(true);
+          if(cloud)cloud.newPoint(normalize(p));
         } catch(e) { setDiagnostic(readableError(e));renderStatus(); }
         finally { captureBusy=false;el('captureBtn').disabled=false;el('favoriteBtn').disabled=false; }
       }
@@ -596,7 +618,7 @@
       function addressOf(p){const d=state.addresses[addressKey(p)];return d&&typeof d.address==='string'?d.address.trim():'';}
       function addressInfo(p){const d=state.addresses[addressKey(p)];return d&&typeof d.address==='string'?d:null;}
       function editAddress(p){
-        const value=window.prompt('Dirección postal completa de este punto (se guardará solo en tu navegador). Deja vacío para quitarla:',addressOf(p));
+        const value=window.prompt('Dirección postal completa de este punto (se sincroniza si conectaste Google). Deja vacío para quitarla:',addressOf(p));
         if(value===null)return;
         const v=value.trim().slice(0,250),k=addressKey(p);
         if(v)state.addresses[k]={address:v,source:'manual'};
@@ -604,6 +626,7 @@
         store();renderAll();setDiagnostic(v?'Dirección guardada: '+v:'Dirección manual eliminada.');
       }
       async function lookupAddress(p){
+        if(cloud&&cloud.connected()){await cloud.lookup(p);return;}
         if(!state.geoapifyKey){setDiagnostic('Configura antes tu propia clave Geoapify en Opciones y datos o usa Dirección para introducirla manualmente.');return;}
         const k=addressKey(p),button=el('saveGeoapifyBtn');
         button.disabled=true;setDiagnostic('Consultando dirección aproximada de las coordenadas…');
@@ -978,10 +1001,33 @@
       });
       el('clearBtn').addEventListener('click',()=>{
         if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
+        if(cloud&&!cloud.prepareLocalClear())return;
         state.days={};state.favorites=[];state.addresses={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;state.mapSelectedDate='all';state.mapSelectedHour='all';
         store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();});
+      // Keep Google optional: failure loading its adapter never blocks local GPS.
+      if(window.GpsSync&&window.GpsGoogle){
+        cloud=window.GpsGoogle.init({
+          snapshot:()=>window.GpsSync.entities(allLocations(),state.favorites,state.addresses),
+          apply:events=>{
+            const known=new Set(allLocations().map(window.GpsSync.pointId));
+            for(const event of events){
+              const p=event.value;
+              if(event.kind==='record'&&valid(p)&&!known.has(window.GpsSync.pointId(p))){appendLocation(p);known.add(window.GpsSync.pointId(p));}
+              else if(event.kind==='favorite'&&valid(p)){
+                const id=window.GpsSync.pointId(p),index=state.favorites.findIndex(f=>window.GpsSync.pointId(f)===id);
+                if(p.enabled===false){if(index>=0)state.favorites.splice(index,1);}
+                else if(index>=0)state.favorites[index]=Object.assign(normalize(p),{label:String(p.label||'')});
+                else state.favorites.push(Object.assign(normalize(p),{label:String(p.label||'')}));
+              }else if(event.kind==='address'){
+                const k=event.entityId.slice(8);
+                if(p.address)state.addresses[k]={...p};else delete state.addresses[k];
+              }
+            }
+          },save:store,render:()=>renderAll(true),diagnostic:setDiagnostic
+        });
+      }
       renderAll(true);
       if(state.autoStart) startTracking();
       else setDiagnostic('Seguimiento detenido. Pulsa Iniciar seguimiento para capturar nuevas ubicaciones.');
