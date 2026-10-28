@@ -55,6 +55,8 @@ La integración con Google Apps Script/Google Sheets para leer direcciones, sinc
 ## Presentación del historial
 
 - Las ubicaciones se organizan por día y hora, en tarjetas profesionales adaptables a teléfonos pequeños.
+- La interfaz utiliza un **diseño compacto**: panel GPS en cuadrícula, indicadores y controles de menor altura, tarjetas de medición más bajas, distancias en línea de metadatos y acciones en una barra corta (dos filas en teléfonos). El diseño mantiene blancos táctiles de aproximadamente 40 píxeles, los cinco colores alternados, la accesibilidad y el tema oscuro.
+- Las tarjetas de registros muestran la hora sin repetir la fecha del encabezado diario; los favoritos mantienen fecha explícita.
 - Cada tarjeta alterna entre cinco tonos suaves (verde azulado, violeta, ámbar, azul y rosa), con un borde lateral de mayor contraste y acentos en los controles. La secuencia continúa entre grupos de horas y fechas, también se aplica a favoritos, y se adapta al tema oscuro sin cambiar los datos GPS.
 - Datos principales: hora, fecha, coordenadas, precisión y distancia, con dirección cuando está disponible.
 - **Opciones** agrupa administración, modificación de dirección y eliminación, evitando nueve botones visibles en cada registro.
