@@ -82,6 +82,44 @@
     .location-more-grid{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%;border-top:1px solid var(--line);padding:13px 0 1px;margin-top:10px}
     .location-more-title{flex-basis:100%;font-size:10px;text-transform:uppercase;letter-spacing:.09em;font-weight:850;color:var(--muted);margin:0 0 1px}
     .location-more[open] .location-more-chevron{transform:rotate(180deg)}
+
+    /* Tonos alternos por registro. Fondo tenue + borde visible + franja lateral para
+       distinguir las mediciones, sin sacrificar contraste o modo oscuro. */
+    .location-card{
+      --card-accent:#0d766e;
+      --card-soft:#ecf8f3;
+      --card-edge:#a5d7cb;
+      border:1px solid var(--card-edge);
+      border-left:6px solid var(--card-accent);
+      background:linear-gradient(110deg,var(--card-soft) 0%,var(--panel) 86%);
+      transition:border-color .16s ease,box-shadow .16s ease;
+    }
+    .location-card[data-tone="teal"]{--card-accent:#0d766e;--card-soft:#ecf8f3;--card-edge:#a5d7cb}
+    .location-card[data-tone="purple"]{--card-accent:#6952a8;--card-soft:#f3efff;--card-edge:#c9bcec}
+    .location-card[data-tone="amber"]{--card-accent:#8d5914;--card-soft:#fff6e6;--card-edge:#ebd4a4}
+    .location-card[data-tone="blue"]{--card-accent:#225f9f;--card-soft:#ecf4ff;--card-edge:#b8d0eb}
+    .location-card[data-tone="rose"]{--card-accent:#a54767;--card-soft:#fff0f4;--card-edge:#eab9cb}
+    .location-card .location-pin{background:color-mix(in srgb,var(--card-accent) 12%,var(--panel));color:var(--card-accent)}
+    .location-card .location-accuracy{
+      background:color-mix(in srgb,var(--card-accent) 9%,var(--panel));
+      border-color:color-mix(in srgb,var(--card-accent) 23%,var(--line));
+      color:var(--card-accent);
+    }
+    .location-card .location-actionbar{
+      background:color-mix(in srgb,var(--card-accent) 5%,var(--panel));
+    }
+    .location-card .location-action-primary{
+      background:var(--card-accent);border-color:var(--card-accent);color:#fff;
+    }
+    .location-card .location-action-primary:hover{background:var(--card-accent);color:#fff;filter:brightness(1.08)}
+    body.dark-mode .location-card[data-tone="teal"]{--card-soft:#16362f;--card-edge:#26766c;--card-accent:#45b8a7}
+    body.dark-mode .location-card[data-tone="purple"]{--card-soft:#292339;--card-edge:#7461a2;--card-accent:#b9a3ef}
+    body.dark-mode .location-card[data-tone="amber"]{--card-soft:#363022;--card-edge:#8c6a37;--card-accent:#ebbd69}
+    body.dark-mode .location-card[data-tone="blue"]{--card-soft:#1e3042;--card-edge:#4c7eae;--card-accent:#8dbced}
+    body.dark-mode .location-card[data-tone="rose"]{--card-soft:#392831;--card-edge:#a2667d;--card-accent:#ec9db7}
+    body.dark-mode .location-card .location-action-primary{color:#102233}
+    body.dark-mode .location-card .location-action-primary:hover{color:#102233}
+
     #favoritesList>.location-card{margin:0 0 14px}
     .section-actions{margin-bottom:14px}
     .records-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;margin-bottom:15px;background:var(--bg);border:1px solid var(--line);border-radius:13px;padding:15px 18px}
@@ -553,8 +591,12 @@
           })()
         );
       }
-      function locationCard(p,isFavorite=false){
+      function locationCard(p,isFavorite=false,colorIndex=0){
         const card=document.createElement('article');card.className='location-card';
+        // Asignación consecutiva entre grupos de horas y días; los favoritos
+        // utilizan su propia serie de colores.
+        const tones=['teal','purple','amber','blue','rose'];
+        card.dataset.tone=tones[colorIndex%tones.length];
         const top=document.createElement('div');top.className='location-card-top';
         const identity=document.createElement('div');identity.className='location-identity';
         const pin=document.createElement('span');pin.className='location-pin';pin.append(uiIcon(isFavorite?'star':'pin'));
@@ -640,6 +682,7 @@
         const locations=filteredLocations().reverse();
         if(!locations.length) {const m=document.createElement('div');m.className='empty';m.textContent=allLocations().length?'No existen registros para estos filtros. Cambia la fecha u hora.':'Sin registros. Activa el seguimiento, registra una posición o importa un historial.';root.append(m);return;}
         const dates=[...new Set(locations.map(p=>dateKey(p.timestamp)))];
+        let colorIndex=0;
         dates.forEach(dk=>{
           const group=document.createElement('details');group.className='group';group.dataset.groupKey='d:'+dk;
           group.open=openState.has(group.dataset.groupKey)?openState.get(group.dataset.groupKey):dates.length<5;
@@ -653,7 +696,7 @@
             sub.open=openState.has(sub.dataset.groupKey)?openState.get(sub.dataset.groupKey):hours.length<4;
             const head=document.createElement('summary'),list=dayLocations.filter(p=>hourKey(p.timestamp)===hk);
             groupHeading(head,hk.padStart(2,'0')+':00',list.length,list.length===1?'registro':'registros','clock');
-            sub.append(head);list.forEach(p=>sub.append(locationCard(p,false)));group.append(sub);
+            sub.append(head);list.forEach(p=>sub.append(locationCard(p,false,colorIndex++)));group.append(sub);
           });
           root.append(group);
         });
@@ -662,7 +705,7 @@
         const root=el('favoritesList');root.replaceChildren();
         const favs=[...state.favorites].filter(valid).sort((a,b)=>b.timestamp-a.timestamp);
         if(!favs.length){const m=document.createElement('div');m.className='empty';m.textContent='Todavía no hay favoritos.';root.append(m);return;}
-        favs.forEach(p=>root.append(locationCard(p,true)));
+        favs.forEach((p,i)=>root.append(locationCard(p,true,i)));
       }
       function renderAll() {renderStatus();renderFilters();renderRecords();renderFavorites();}
       function parseCsv(text) {
