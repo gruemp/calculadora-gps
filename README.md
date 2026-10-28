@@ -52,6 +52,10 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 La integración con Google Apps Script/Google Sheets para leer direcciones, sincronizar registros entre dispositivos o almacenar automáticamente recorridos **no está activada**. Requiere validar la hoja y sus columnas, el protocolo existente de Apps Script, autorización de acceso, protección de datos y pruebas de sincronización. Hay una preparación detallada en [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) para retomar en ChatGPT Work. No publiques una hoja privada ni una URL sensible de Apps Script dentro de una página pública.
 
 
+## Desplazamiento libre
+
+Toda la aplicación usa **un único desplazamiento vertical de la página**: el panel de seguimiento, el historial, favoritos y opciones se mueven naturalmente al deslizar. No hay paneles fijos o inmovilizados, ni límites de altura que obliguen a desplazar una lista interna. El historial mantiene el diseño compacto, los colores alternados y los grupos expandibles por día y hora.
+
 ## Presentación del historial
 
 - Las ubicaciones se organizan por día y hora, en tarjetas profesionales adaptables a teléfonos pequeños.
