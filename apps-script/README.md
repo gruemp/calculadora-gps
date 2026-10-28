@@ -1,15 +1,19 @@
 # Servicio privado de Control GPS
 
-Estado actualizado: **backend instalado en un proyecto privado vinculado a una hoja de ensayo; autorización y despliegue API ejecutable pendientes**. El código guardado en el editor se cotejó completo con el publicado. Publicar estos archivos en GitHub Pages no despliega Apps Script.
+Estado actualizado: **backend instalado, autorizado y probado realmente desde el editor en una hoja privada de ensayo; despliegue API ejecutable pendiente**. El código guardado en el editor se cotejó completo con el publicado. Publicar estos archivos en GitHub Pages no despliega Apps Script.
 
 ## Verificación desde el navegador integrado
 
 - Se inició sesión con la cuenta propietaria y se revisaron los 39 proyectos visibles de Apps Script. El geocodificador de LoNecesito existe y conserva su proyecto Cloud predeterminado; no se modificó. No apareció un backend privado de Control GPS reutilizable.
 - Se creó una hoja privada de ensayo, se guardó en la carpeta de documentos nuevos indicada por el usuario y se creó un único proyecto Apps Script vinculado a ella. Los identificadores privados y la cuenta propietaria se conservan en las propiedades del script y no se publican en este repositorio.
 - Se guardaron código, manifiesto y propiedades de destino, propietario y geocodificación; presupuesto configurado: 100 consultas/día. Se verificaron los diez encabezados exactos de `control_gps_eventos_v1`, sin registros personales. Sheets indica «Privado, solo para mí».
-- La primera ejecución de `gpsInitialize` abrió la autorización de Google y quedó detenida en «Google no ha verificado esta aplicación». No se concedieron permisos en nombre del usuario ni se completó la ejecución.
+- El propietario autorizó expresamente continuar con los permisos de Sheets e identificación. Se completó el consentimiento de Google y `gpsInitialize` terminó correctamente. El aviso de aplicación no verificada no equivale a verificación pública de Google.
 - El diálogo de API ejecutable exige cambiar a un proyecto Cloud gestionado por el usuario. Google Cloud mostró «Site Unavailable» en este navegador, incluso tras una recarga. No se pudo configurar el proyecto estándar ni el cliente OAuth. No se creó una implementación pública como alternativa.
-- **No hay pruebas reales de escritura/lectura por Apps Script ni sincronización entre dispositivos aprobadas todavía.** La sincronización de la aplicación permanece desactivada.
+- **Pruebas reales aprobadas desde el editor (2026-10-27, 20:45 America/Bogota):** escritura, lectura, confirmaciones, reenvío idempotente, cursor, corrección manual, conservación de versiones y conflictos, retirada de favoritos e invalidación de coordenadas sin escrituras. El diagnóstico informó `passed:true`; se leyó de nuevo la hoja y se comprobaron seis eventos, secuencias 1–6 y seis IDs de operación únicos.
+- Una consulta real de `Maps.newGeocoder` al punto público de Times Square devolvió dirección aproximada, calle y número, con calidad del proveedor `ROOFTOP`. Esa etiqueta no convierte el resultado en una dirección verificada del usuario. Consumo del ensayo: una consulta; no se usó GPS del dispositivo.
+- El diagnóstico está en `tests/apps-script-live.gs`. Solo se permite con `GPS_ALLOW_SELF_TEST=true` y hoja vacía; al terminar restablece la propiedad a `false`, estado que se verificó. Los seis eventos son fixtures técnicos y permanecen en la hoja de ensayo, sin eliminar versiones.
+- El enlace al selector Cloud proporcionado por Apps Script también devolvió «Site Unavailable». No se vinculó un proyecto a ciegas: el cambio revocaría las autorizaciones existentes y exige configurar correctamente Cloud.
+- **Pendientes reales:** OAuth para el origen público, API ejecutable, CORS y sincronización desde GitHub Pages y un segundo dispositivo. La aplicación pública permanece en modo local hasta completar y verificar esa configuración.
 
 ## Recursos existentes e identidad
 
@@ -75,6 +79,6 @@ node --test tests/sync.test.cjs
 
 La suite comprueba permisos, guardado/lectura, dos clientes, respuesta perdida después de escritura, deduplicación, conflictos, favoritos, direcciones, desconexión, cuota, paginación, bloqueo entre destinos, almacenamiento local fallido y preservación exacta del CSS anterior.
 
-Antes de dar por activa la conexión realizar en la hoja de ensayo: OAuth desde el origen público; aceptar/rechazar permisos; escritura/lectura desde dos navegadores; recarga y reintento tras desconexión; cambios simultáneos; revocación; cuota real; validación de direcciones con coordenadas públicas de prueba. Comparar el número de IDs lógicos del backup antes/después y conservar el diario. **Ninguna de estas pruebas reales de Google ha sido ejecutada en esta entrega.**
+Antes de dar por activa la conexión realizar en la hoja de ensayo: OAuth desde el origen público; aceptar/rechazar permisos; escritura/lectura desde dos navegadores; recarga y reintento tras desconexión; cambios simultáneos; revocación; cuota real; validación de direcciones con coordenadas públicas de prueba. Comparar el número de IDs lógicos del backup antes/después y conservar el diario. **Las pruebas del backend realizadas desde el editor y sus resultados figuran arriba. OAuth desde Pages, transporte HTTP del API ejecutable y dispositivos distintos siguen sin probarse.**
 
 Fuentes oficiales: [scripts.run](https://developers.google.com/apps-script/api/reference/rest/v1/scripts/run), [API ejecutable y proyecto Cloud común](https://developers.google.com/apps-script/api/how-tos/execute), [OAuth para navegador y CORS](https://developers.google.com/identity/oauth2/web/guides/use-token-model), [cuotas](https://developers.google.com/apps-script/guides/services/quotas), [ContentService/JSONP](https://developers.google.com/apps-script/guides/content).

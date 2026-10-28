@@ -49,7 +49,7 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 
 ## Apps Script y conexiones (última etapa)
 
-Se implementaron el cliente de sincronización opcional, la cola persistente, el backend privado de Apps Script y la consulta de direcciones mediante Google autenticado. **El backend está guardado en un proyecto privado de Apps Script vinculado a una hoja de ensayo, pero no está autorizado ni desplegado como API ejecutable; no hay sincronización remota activa todavía.** Se conserva el modo local y todo el CSS existente. La nueva configuración está únicamente en Opciones y datos.
+Se implementaron el cliente de sincronización opcional, la cola persistente, el backend privado de Apps Script y la consulta de direcciones mediante Google autenticado. **El backend está guardado en un proyecto privado de Apps Script vinculado a una hoja de ensayo, está autorizado y superó el ensayo real de escritura, lectura, reintentos y direcciones desde el editor, pero no está desplegado como API ejecutable; no hay sincronización desde la web activa todavía.** Se conserva el modo local y todo el CSS existente. La nueva configuración está únicamente en Opciones y datos.
 
 La activación requiere un API ejecutable y un cliente OAuth del mismo proyecto estándar de Google Cloud, una hoja privada y pruebas reales. Consulta [apps-script/README.md](apps-script/README.md) para configurar y verificar la conexión. La suite local se ejecuta con `node --test tests/sync.test.cjs`; sus servicios Google son simulados. [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el seguimiento de pendientes.
 
