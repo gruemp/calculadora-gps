@@ -627,7 +627,15 @@
       }
       async function lookupAddress(p){
         if(cloud&&cloud.connected()){await cloud.lookup(p);return;}
-        if(!state.geoapifyKey){setDiagnostic('Configura antes tu propia clave Geoapify en Opciones y datos o usa Dirección para introducirla manualmente.');return;}
+        if(!state.geoapifyKey){
+          const message='Para buscar la dirección, pulsa Conectar con Google y autoriza la sesión. Reconectar también recupera el historial remoto. Puedes usar una clave Geoapify propia o Editar dirección como alternativas.';
+          setDiagnostic(message);
+          document.querySelector('[data-tab="settings"]').click();
+          el('googleSyncStatus').textContent=message;
+          el('googleConnectBtn').focus();
+          el('googleConnectBtn').scrollIntoView({block:'center',behavior:'smooth'});
+          return;
+        }
         const k=addressKey(p),button=el('saveGeoapifyBtn');
         button.disabled=true;setDiagnostic('Consultando dirección aproximada de las coordenadas…');
         try{

@@ -130,11 +130,17 @@ function adapter(s,{consent=false,httpStatus=200}={}){
     return {ok:httpStatus===200,status:httpStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
   }});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../gps-google.js'),'utf8'),ctx);
-  const current=snapshot('Privada');
-  const api=win.GpsGoogle.init({snapshot:()=>current,apply:events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},save:()=>true,render:()=>{},diagnostic:()=>{}});
-  return {api,storage,requests,element,click:id=>element(id).listeners.click(),revoked:()=>revoked};
+  const current=snapshot('Privada'),diagnostics=[];
+  const api=win.GpsGoogle.init({snapshot:()=>current,apply:events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},save:()=>true,render:()=>{},diagnostic:message=>diagnostics.push(message)});
+  return {api,storage,requests,element,diagnostics,click:id=>element(id).listeners.click(),revoked:()=>revoked};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
+test('manual address lookup reports progress and provider errors outside hidden settings',async()=>{
+  const s=server(),a=adapter(s,{consent:true});a.click('googleConnectBtn');await settle();
+  await a.api.lookup(point);assert.match(a.diagnostics[0],/Consultando/);assert.match(a.diagnostics.at(-1),/guardada/);
+  await a.api.lookup(point);await a.api.lookup(point);
+  assert.match(a.diagnostics.at(-1),/Dirección no disponible.*GPS_GEOCODE_QUOTA/);
+});
 test('Google adapter sends nothing without consent, then uses authenticated Google endpoint and local backup',async()=>{
   const s=server(),a=adapter(s);a.click('googleConnectBtn');await settle();assert.equal(a.requests.length,0);
   a.element('googleConsent').checked=true;a.click('googleConnectBtn');await settle();

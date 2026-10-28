@@ -118,10 +118,13 @@
     window.addEventListener('online',()=>retry(1000));
     window.addEventListener('storage',event=>{if(event.key==='gpsTrackerState'&&token)stop('Otra pestaña modificó los datos locales. Recarga esta página antes de reconectar.');});
     async function lookup(p,automatic=false){
+      const report=message=>{status(message);if(!automatic)diagnostic(message);};
       if(!engine?.ready||!token){if(!automatic)status('Conecta con Google para consultar la dirección.');return false;}
-      if(geoBusy||(automatic&&(Date.now()-geoAt<60000||geoCount>=20)))return false;
-      if(!automatic&&!confirm('¿Enviar estas coordenadas a Google para consultar una dirección aproximada?'))return true;
+      if(geoBusy){if(!automatic)report('Ya hay una consulta de dirección en curso. Espera su resultado.');return false;}
+      if(automatic&&(Date.now()-geoAt<60000||geoCount>=20))return false;
+      if(!automatic&&!confirm('¿Enviar estas coordenadas a Google para consultar una dirección aproximada?')){report('Consulta de dirección cancelada.');return true;}
       geoBusy=true;geoAt=Date.now();geoCount++;
+      report('Consultando dirección aproximada con Google…');
       const session=epoch,before=snapshot()['address|'+root.GpsSync.addressId(p)];
       try{
         const result=await send({action:'geocode',latitude:Number(p.latitude),longitude:Number(p.longitude)});
@@ -131,7 +134,7 @@
         if(!result.address)throw Error('No se encontró dirección.');
         apply([{kind:'address',entityId:'address|'+root.GpsSync.addressId(p),value:result}]);save();render();
         diagnostic('Dirección aproximada de Google guardada. Verifica calle y número; puedes corregirla.');
-      }catch(error){status('Dirección no disponible: '+error.message+'. Puedes introducirla manualmente.');}
+      }catch(error){report('Dirección no disponible: '+error.message+'. Puedes introducirla manualmente.');}
       finally{geoBusy=false;}
       return true;
     }
