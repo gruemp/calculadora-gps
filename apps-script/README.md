@@ -1,6 +1,15 @@
 # Servicio privado de Control GPS
 
-Estado: **código implementado y probado con servicios simulados; no desplegado ni autorizado en Google**. Publicar estos archivos en GitHub Pages no despliega Apps Script.
+Estado actualizado: **backend instalado en un proyecto privado vinculado a una hoja de ensayo; autorización y despliegue API ejecutable pendientes**. El código guardado en el editor se cotejó completo con el publicado. Publicar estos archivos en GitHub Pages no despliega Apps Script.
+
+## Verificación desde el navegador integrado
+
+- Se inició sesión con la cuenta propietaria y se revisaron los 39 proyectos visibles de Apps Script. El geocodificador de LoNecesito existe y conserva su proyecto Cloud predeterminado; no se modificó. No apareció un backend privado de Control GPS reutilizable.
+- Se creó una hoja privada de ensayo, se guardó en la carpeta de documentos nuevos indicada por el usuario y se creó un único proyecto Apps Script vinculado a ella. Los identificadores privados y la cuenta propietaria se conservan en las propiedades del script y no se publican en este repositorio.
+- Se guardaron código, manifiesto y propiedades de destino, propietario y geocodificación; presupuesto configurado: 100 consultas/día. Se verificaron los diez encabezados exactos de `control_gps_eventos_v1`, sin registros personales. Sheets indica «Privado, solo para mí».
+- La primera ejecución de `gpsInitialize` abrió la autorización de Google y quedó detenida en «Google no ha verificado esta aplicación». No se concedieron permisos en nombre del usuario ni se completó la ejecución.
+- El diálogo de API ejecutable exige cambiar a un proyecto Cloud gestionado por el usuario. Google Cloud mostró «Site Unavailable» en este navegador, incluso tras una recarga. No se pudo configurar el proyecto estándar ni el cliente OAuth. No se creó una implementación pública como alternativa.
+- **No hay pruebas reales de escritura/lectura por Apps Script ni sincronización entre dispositivos aprobadas todavía.** La sincronización de la aplicación permanece desactivada.
 
 ## Recursos existentes e identidad
 
@@ -8,7 +17,7 @@ La rama `codex/diseno-original` de `gruemp/lonecesito` contiene el proyecto **Lo
 
 Ese servicio no almacena historiales y responde mediante JSONP anónimo, ejecutándose como propietario. No debe recibir historiales privados ni convertirse en un endpoint público de escritura. Se reutilizó el patrón de `Maps.newGeocoder`, los componentes geográficos y la regla que distingue calles de regiones/plus codes. No se reutilizan las colecciones de publicaciones ni las analíticas de Natura.
 
-El conector Drive utilizado filtra MIME types y no administra Apps Script: una búsqueda vacía de proyectos no demuestra que no existan. Las carpetas de GPS revisadas contienen fuentes históricas; no se identificó una hoja operativa de sincronización. **Antes de crear nada, revisar el panel Apps Script y el proyecto Cloud existente para determinar si hay un servicio privado reutilizable.** Este repositorio no crea automáticamente proyectos ni hojas.
+El conector Drive utilizado filtra MIME types y no administra Apps Script: una búsqueda vacía de proyectos no demuestra que no existan. El inventario posterior en el navegador permitió comprobar los proyectos de la cuenta y preparar el backend privado descrito arriba. **Reutilizar la hoja de ensayo y su proyecto vinculado ya creados; no volver a crearlos.** Este repositorio no crea automáticamente proyectos ni hojas.
 
 ## Preparar el servicio desde la cuenta propietaria
 

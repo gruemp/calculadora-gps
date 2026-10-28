@@ -1,8 +1,8 @@
 # Integración pendiente: Apps Script y Google Sheets para Control GPS
 
-**Estado (2026-10-27, America/Bogota):** cliente y backend implementados; 19 pruebas locales con servicios simulados superadas. Pendientes: acceso administrativo a Apps Script/Cloud, selección de hoja privada de ensayo, autorización OAuth, despliegue API ejecutable y pruebas reales entre dispositivos. **La sincronización remota no está activa.**
+**Estado (2026-10-27, America/Bogota):** cliente y backend implementados; 19 pruebas locales con servicios simulados superadas. Backend guardado en Apps Script y hoja privada de ensayo creada y verificada. Pendientes: autorización del script, acceso a Google Cloud, cliente OAuth/proyecto estándar, despliegue API ejecutable y pruebas reales entre dispositivos. **La sincronización remota no está activa.**
 
-La configuración exacta, el contrato de datos y las pruebas pendientes están en [apps-script/README.md](apps-script/README.md). No se han creado proyectos ni hojas, modificado LoNecesito ni autorizado cuentas de Google.
+La configuración exacta, el contrato de datos y las pruebas pendientes están en [apps-script/README.md](apps-script/README.md). Se crearon una hoja privada de ensayo y su único proyecto vinculado tras revisar los proyectos existentes. No se modificó LoNecesito. La autorización del script quedó pendiente en el aviso de aplicación no verificada de Google; la consola Cloud no es accesible desde este navegador. Los identificadores privados no se publican en GitHub.
 
 Lo que sigue conserva el diagnóstico anterior como antecedente; las afirmaciones de ausencia de código se refieren al punto de partida.
 
