@@ -3,7 +3,10 @@
   'use strict';
   const KEY='gpsSyncStateV1', BACKUP='gpsSyncBackupV1';
   const clone=v=>JSON.parse(JSON.stringify(v));
-  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  // API object properties may arrive in a different order after JSON transport.
+  const canonical=v=>Array.isArray(v)?v.map(canonical):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])])):v;
+  const same=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+  const conflictId=event=>event.operationId||event.seq;
   const pointId=p=>[Number(p.timestamp),Number(p.latitude),Number(p.longitude)].join('|');
   const addressId=p=>Number(p.latitude).toFixed(6)+','+Number(p.longitude).toFixed(6);
   function entities(records,favorites,addresses){
@@ -17,6 +20,8 @@
     constructor({storage,send,apply,status=()=>{},uuid=()=>crypto.randomUUID()}){
       Object.assign(this,{storage,send,apply,status,uuid});
       this.data=JSON.parse(storage.getItem(KEY)||'null')||{version:1,device:uuid(),cursor:0,observed:{},pending:[],revisions:{},audit:[]};
+      const seen=new Set();
+      this.data.audit=this.data.audit.filter(event=>{const id=conflictId(event);if(seen.has(id))return false;seen.add(id);return true;});
       this.busy=false;this.ready=false;
     }
     persist(){this.storage.setItem(KEY,JSON.stringify(this.data));}
@@ -72,7 +77,7 @@
           if(!Number.isSafeInteger(event.seq)||event.seq<=this.data.cursor||event.seq>result.cursor)throw Error('Secuencia remota inválida.');
           next.revisions[event.entityId]=event.seq;
           const pending=next.pending.some(p=>p.entityId===event.entityId);
-          if(event.conflict)next.audit.push(clone(event));
+          if(event.conflict&&!next.audit.some(item=>conflictId(item)===conflictId(event)))next.audit.push(clone(event));
           if(!pending){
             changes.push(event);
             if((event.kind==='favorite'&&event.value.enabled===false)||(event.kind==='address'&&!event.value.address))delete next.observed[event.entityId];

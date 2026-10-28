@@ -43,6 +43,32 @@ test('uncertain response retried after reload creates no duplicate rows',async()
 test('repeated observation of identical local state produces no duplicates',async()=>{
   const s=server(),{e}=client(s);await e.bind();for(let i=0;i<10;i++)e.observe(snapshot());await e.sync();assert.equal(s.data.length,3);
 });
+test('JSON property order from the API does not requeue unchanged data after reload',async()=>{
+  const s=server(),storage=memory();
+  const reorder=value=>Array.isArray(value)?value.map(reorder):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,reorder(value[key])])):value;
+  const send=async request=>reorder(s.call(request));
+  const current=snapshot('Calle manual');
+  const apply=async events=>{for(const event of events){
+    if(event.kind==='favorite'&&event.value.enabled===false)delete current[event.entityId];
+    else current[event.entityId]={kind:event.kind,value:event.value};
+  }};
+  const a=client(s,{storage,send,apply});await a.e.bind();a.e.observe(current);await a.e.sync();
+  const normalize=()=>entities([point],[{...point,label:'Casa'}],{'4.600000,-74.100000':current['address|4.600000,-74.100000'].value});
+  const before=s.data.length;
+  const b=client(s,{storage,send,apply});await b.e.bind();b.e.observe(normalize());
+  assert.equal(b.e.data.pending.length,0);await b.e.sync();assert.equal(s.data.length,before);
+  b.e.observe(entities([point],[{...point,label:'Oficina'}],{'4.600000,-74.100000':current['address|4.600000,-74.100000'].value}));
+  await b.e.sync();assert.equal(s.data.length,before+1);assert.equal(JSON.parse(s.data.at(-1)[8]).label,'Oficina');
+});
+test('replaying a retained conflict does not inflate the local audit',async()=>{
+  const s=server(),a=client(s);await a.e.bind();a.e.observe(snapshot('Primera'));await a.e.sync();
+  const b=client(s);await b.e.bind();await b.e.sync();
+  a.e.observe(snapshot('Segunda'));b.e.observe(snapshot('Tercera'));await a.e.sync();await b.e.sync();
+  assert.equal(b.e.data.audit.length,1);
+  b.e.data.cursor=0;b.e.persist();await b.e.sync();assert.equal(b.e.data.audit.length,1);
+  b.e.data.audit.push({...b.e.data.audit[0]});b.e.persist();
+  const recovered=client(s,{storage:b.storage});await recovered.e.bind();assert.equal(recovered.e.data.audit.length,1);
+});
 test('concurrent address corrections preserve both versions, flag conflict and ignore client clocks',async()=>{
   const s=server(),a=client(s);await a.e.bind();a.e.observe(snapshot('Primera'));await a.e.sync();
   const b=client(s);await b.e.bind();await b.e.sync();
