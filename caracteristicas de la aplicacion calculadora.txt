@@ -2,11 +2,11 @@ REQUISITOS VIGENTES – CONTROL GPS
 Actualización: 2026-10-27
 
 - Al abrir inicio.html o index.html, mostrar directamente la interfaz GPS; no presentar calculadora, contraseña ni un modal intermedio.
-- Ver mapa interactivo de OpenStreetMap desde el primer momento, incluso si no hay ubicaciones registradas.
+- Presentar el seguimiento y el historial sin ningún mapa integrado ni carga de Leaflet/OpenStreetMap.
 - Registrar ubicaciones automáticamente de forma visible, tras conceder permisos GPS, con intervalo inicial de 5 minutos; permitir iniciar, detener y cambiar intervalo.
 - Diferenciar entre «Registrar ubicación» (historial) y «Añadir favorito» (favoritos).
 - Mostrar la última ubicación conocida y avisos de permisos, conexión y almacenamiento.
-- Filtrar por día y por hora; mostrar recorridos por segmentos y puntos con acceso a Google Maps.
+- Filtrar las tarjetas por día y hora; mantener enlaces externos a Google Maps, sin mostrar recorridos ni un mapa interno.
 - Organizar el historial local por fechas y horas expandibles.
 - Conservar el historial y preferencias de versiones anteriores del proyecto mediante gpsTrackerState en localStorage.
 - Exportar JSON e importar JSON o CSV. Los CSV pueden provenir de Google Sheets, con encabezados como fecha, hora y coordenadas.
@@ -16,16 +16,23 @@ Actualización: 2026-10-27
 NOTAS TÉCNICAS:
 - La versión web almacena datos en el navegador. No está implementado el envío automático a Google Sheets; para hacerlo se necesita definir y probar el contrato del endpoint Apps Script y sus permisos.
 - No se garantiza el seguimiento cuando el navegador suspende la pestaña o con pantalla apagada.
-- HTTPS/localhost, permisos de geolocalización y conexión a internet son necesarios para captura/mapas.
+- HTTPS/localhost y permiso GPS son necesarios para captura; Google Maps y servicios postales externos requieren conectividad.
 - Para instrucciones detalladas, consultar README.md.
 
 ACTUALIZACIÓN DE ALCANCE – MEDICIÓN, PRECISIÓN Y COMPARTIR
 
-- Mantener la primera versión visual e interactiva de Control GPS, sin calculadora, contraseña ni fichas HTML/PNG.
-- Medir distancias en línea recta desde la ubicación actual obtenida por GPS, con precisión informada y línea de referencia.
+- Mantener el panel Control GPS sin calculadora, contraseña, fichas HTML/PNG ni mapa integrado.
+- Medir distancias en línea recta desde la ubicación actual obtenida por GPS, con precisión informada en texto, sin mapa ni línea gráfica.
 - Umbral configurable del máximo error GPS aceptable; rechazar capturas con precisión inferior al mínimo elegido.
 - Copiar/compartir datos de cada ubicación y del conjunto de registros/favoritos, con URL clicable de Maps, fecha/hora, precisión, distancia cuando se conoce y dirección postal escrita o consultada.
 - Texto visible del hipervínculo = dirección completa solo donde se admite portapapeles enriquecido. En WhatsApp: dirección y URL pulsable como texto plano.
 - Dirección postal no inferida sin geocodificación: edición manual, o consulta puntual aproximada vía Geoapify con clave propia protegida.
 - Conservar historial y preferencias originales sin borrar datos del navegador; incluir direcciones en JSON.
 - PENDIENTE: integración Apps Script/Sheets en etapa posterior desde Work.
+
+ACTUALIZACIÓN VISUAL DEL HISTORIAL
+
+- Evitar listas desordenadas de botones: mostrar datos en tarjetas, con jerarquía visual y dimensiones adaptables a móvil.
+- Agrupar Ver en Google Maps, Medir, Copiar y Compartir; esconder administración bajo «Opciones».
+- Conservar favoritos, copia, compartición, medición y gestión de direcciones.
+- Prohibir mapas incrustados en la aplicación, sin impedir enlaces externos opcionales a Google Maps.
