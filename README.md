@@ -55,6 +55,7 @@ La integración con Google Apps Script/Google Sheets para leer direcciones, sinc
 ## Presentación del historial
 
 - Las ubicaciones se organizan por día y hora, en tarjetas profesionales adaptables a teléfonos pequeños.
+- Cada tarjeta alterna entre cinco tonos suaves (verde azulado, violeta, ámbar, azul y rosa), con un borde lateral de mayor contraste y acentos en los controles. La secuencia continúa entre grupos de horas y fechas, también se aplica a favoritos, y se adapta al tema oscuro sin cambiar los datos GPS.
 - Datos principales: hora, fecha, coordenadas, precisión y distancia, con dirección cuando está disponible.
 - **Opciones** agrupa administración, modificación de dirección y eliminación, evitando nueve botones visibles en cada registro.
 - **No se muestra ningún mapa dentro de la aplicación.** Google Maps solo se abre fuera del sistema cuando el usuario pulsa expresamente el enlace correspondiente.
