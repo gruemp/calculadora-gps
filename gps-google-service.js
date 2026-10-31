@@ -4,12 +4,12 @@
  * Mantener OAuth con consentimiento y el API ejecutable con acceso restringido.
  * No añadir IDs de hojas, claves privadas, contraseñas ni tokens.
  * API ejecutable existente verificado el 2026-10-31, versión 1, acceso Solo yo.
- * Falta cotejar el cliente OAuth: Cloud no está accesible en esta sesión.
- * Hasta completar ambos, los navegadores previamente configurados usan
- * sus identificadores locales; los nuevos funcionarán sin sincronización.
+ * Cliente OAuth web existente facilitado por el propietario el 2026-10-31.
+ * La configuración pública permite conectar desde dispositivos nuevos.
+ * Los tokens siguen siendo temporales y requieren autorización de Google.
  */
 window.CONTROL_GPS_GOOGLE_SERVICE=Object.freeze({
-  clientId:'',
+  clientId:'142119703617-089dbvcvfblkf0cmlbkjdg358t0rjtsp.apps.googleusercontent.com',
   deploymentId:'AKfycbwCROqvztyP393Th01zLu2W1SSRJ_ljM3_6qa1a8GOKGxfzR6cG-7A1m99hlD3RsjfV'
 });
 
