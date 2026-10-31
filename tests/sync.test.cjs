@@ -113,6 +113,30 @@ test('local persistence failure during pull never advances cursor',async()=>{
 test('local history deletion never issues remote delete',async()=>{
   const s=server(),{e}=client(s);await e.bind();e.observe(entities([point],[],{}));await e.sync();e.observe(entities([],[],{}));await e.sync();assert.equal(s.data.length,2);
 });
+test('simplified interface removes unused controls but retains GPS records and individual actions',()=>{
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../inicio.html'),'utf8');
+  for(const id of ['csvUrl','syncCsvBtn','geoapifyKeyInput','saveGeoapifyBtn','dateSelector','hourSelector','copyAllBtn','shareAllBtn']){
+    assert.ok(!html.includes('id="'+id+'"'),'control sobrante: '+id);
+    assert.ok(!html.includes("el('"+id+"')"),'listener sobrante: '+id);
+  }
+  for(const label of ['Importar CSV desde una URL','Direcciones postales (opcional)','Copiar todos los datos','Compartir todos los datos']){
+    assert.ok(!html.includes(label),'texto sobrante: '+label);
+  }
+  assert.ok(!html.includes('api.geoapify.com'));
+  const code=html.match(/function renderRecords\(\) \{([\s\S]*?)\n      \}\n      function renderFavorites/);
+  assert.ok(code,'renderRecords debe existir');
+  const root={children:[],replaceChildren(){this.children=[];},append(value){this.children.push(value);}};
+  const records=[{timestamp:10},{timestamp:30},{timestamp:20}];
+  const mock={el:id=>{assert.equal(id,'recordsList');return root;},allLocations:()=>records,
+    locationCard:(p,isFavorite,index)=>({timestamp:p.timestamp,isFavorite,index}),
+    document:{createElement:tag=>({tag,textContent:'',className:''})}};
+  vm.runInNewContext('function renderRecords(){'+code[1]+'\n}\nrenderRecords()',mock);
+  assert.deepEqual(root.children.map(p=>p.timestamp),[30,20,10]);
+  assert.deepEqual(root.children.map(p=>p.index),[0,1,2]);
+  assert.ok(html.includes("heading.append(uiText('div',new Date(p.timestamp).toLocaleDateString"),'mostrar fecha en cada tarjeta');
+  assert.ok(html.includes("actionButton('Copiar'")&&html.includes("actionButton('Compartir'"),'acciones individuales');
+  assert.ok(html.includes('id="importFile"'),'importación local disponible');
+});
 test('published app preserves original CSS and local key; all scripts parse',()=>{
   const cp=require('node:child_process');const path=require('node:path');const dir=path.join(__dirname,'..');
   const before=cp.execFileSync('git',['show','305b4978e4f6b42c956ded42f3cf7ca29356b23d:inicio.html'],{cwd:dir,encoding:'utf8'});
