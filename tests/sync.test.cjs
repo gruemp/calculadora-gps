@@ -137,10 +137,14 @@ test('simplified interface removes unused controls but retains GPS records and i
   assert.ok(html.includes("actionButton('Copiar'")&&html.includes("actionButton('Compartir'"),'acciones individuales');
   assert.ok(html.includes('id="importFile"'),'importación local disponible');
 });
-test('published app preserves original CSS and local key; all scripts parse',()=>{
-  const cp=require('node:child_process');const path=require('node:path');const dir=path.join(__dirname,'..');
-  const before=cp.execFileSync('git',['show','305b4978e4f6b42c956ded42f3cf7ca29356b23d:inicio.html'],{cwd:dir,encoding:'utf8'});
-  const after=fs.readFileSync(path.join(dir,'inicio.html'),'utf8');assert.equal(after.match(/<style>([\s\S]*?)<\/style>/)[1],before.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.ok(after.includes("const KEY = 'gpsTrackerState'"));
+test('published app preserves current CSS and local key; all scripts parse',()=>{
+  const path=require('node:path');const dir=path.join(__dirname,'..');
+  // Baseline: main e238b041, after the owner removed filters and expandable groups.
+  // A fixed digest also works in source archives without Git history.
+  const after=fs.readFileSync(path.join(dir,'inicio.html'),'utf8');
+  const css=after.match(/<style>([\s\S]*?)<\/style>/)[1];
+  assert.equal(require('node:crypto').createHash('sha256').update(css).digest('hex'),'2714848bed0734c8c9a4bb1ae6764098afb004007ba52b85f803f401f8d04b6a');
+  assert.ok(after.includes("const KEY = 'gpsTrackerState'"));
   for(const match of after.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
   for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
 });
@@ -195,3 +199,4 @@ test('clearing local projection rewinds recovery without producing remote remova
   const data=JSON.parse(a.storage.getItem(KEY));assert.equal(data.cursor,0);assert.deepEqual(data.observed,{});assert.equal(s.data.length,before);
   const restored=client(s,{storage:a.storage});await restored.e.bind();await restored.e.sync();assert.equal(restored.applied.length,3);assert.equal(s.data.length,before);
 });
+
