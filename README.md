@@ -13,7 +13,7 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 1. Abre la página y autoriza geolocalización. El seguimiento se inicia automáticamente de forma visible, salvo que lo hayas detenido previamente.
 2. Usa **Detener seguimiento** para pausar y **Iniciar seguimiento** para volver a registrar. La elección se conserva al recargar.
 3. El intervalo inicial es de **300 segundos (5 minutos)**; se cambia en **Opciones y datos**.
-4. Filtra las tarjetas del historial por fecha y hora. Cada ubicación dispone de un enlace **Abrir en Google Maps**, que abre un servicio externo.
+4. Consulta el historial, ordenado del registro más reciente al más antiguo y con fecha y hora en cada tarjeta. Cada ubicación dispone de un enlace **Google Maps**, que abre un servicio externo.
 5. **Registrar ubicación** crea un punto de historial; **Añadir favorito** guarda un punto aparte.
 6. Los datos anteriores guardados con la clave local `gpsTrackerState` se mantienen y se visualizan.
 
@@ -25,7 +25,7 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 
 ## Limitaciones y privacidad
 
-- Las coordenadas se almacenan en el dispositivo mediante `localStorage`. Solo se envían a Google Sheets después de configurar el servicio, consentir e iniciar una sesión autorizada.
+- Las coordenadas se almacenan en el dispositivo mediante `localStorage`. Solo se envían a Google Sheets después de consentir e iniciar una sesión autorizada; los identificadores públicos del servicio ya están configurados en el sitio.
 - El seguimiento GPS desde navegadores **no es fiable en segundo plano**: al suspender la pestaña, bloquear la pantalla o cerrar el navegador pueden perderse intervalos. Para registrar ubicaciones con la pantalla apagada de forma confiable hace falta una aplicación móvil con permisos apropiados.
 - Si faltan registros, comprueba los permisos de GPS y el diagnóstico visible; también puedes importar CSV/JSON.
 - Ya no se cargan Leaflet ni las teselas de OpenStreetMap. Los enlaces externos a Google Maps requieren conexión.
@@ -38,20 +38,26 @@ Aplicación web de seguimiento GPS, medición de distancias y consulta del histo
 
 ## Copiar, compartir y dirección postal
 
-- Cada registro y favorito presenta acciones frecuentes (**Google Maps**, **Medir**, **Copiar**, **Compartir**) y un menú desplegable **Opciones** para **Editar dirección**, **Buscar dirección**, **Añadir favorito** cuando corresponda y **Eliminar**.
+- Cada registro y favorito presenta acciones frecuentes (**Google Maps**, **Medir**, **Copiar**, **Compartir**) y botones visibles para **Editar dirección**, **Buscar dirección**, **Añadir favorito** cuando corresponda y **Eliminar**.
 - La información compartida incluye fecha y hora, coordenadas, precisión, dirección cuando se conoce, distancia de referencia si se midió, URL de Google Maps e indicaciones. Sin fichas, sin PDF, sin PNG y sin enlaces HTML exportables por separado.
 - Las direcciones pueden editarse manualmente por ubicación. La opción **Buscar dirección** utiliza Google solo cuando hay sesión autorizada. Las direcciones aproximadas deben verificarse antes de compartirlas.
 - La búsqueda de dirección es manual por punto cuando Google está conectado. La consulta automática de nuevas capturas requiere una autorización separada.
 - **Descargar copia JSON** ahora conserva las direcciones y el umbral de precisión; la importación de backups de la versión actual también puede restaurar las direcciones. Los datos locales anteriores (`gpsTrackerState`) no se eliminan al actualizar, incluso si todavía incluyen campos de fichas antiguas que esta versión ya no muestra.
 
-## Apps Script y conexiones (última etapa)
+## Google Sheets privado: conexión configurada
 
-Se implementaron el cliente de sincronización opcional, la cola persistente, el backend privado de Apps Script y la consulta de direcciones mediante Google autenticado. **El backend privado superó el ensayo real desde el editor y, el 2026-10-28, se verificó su proyecto Cloud estándar y se publicó la versión 1 como API ejecutable con acceso «Solo yo». Tras renovar los mismos permisos, `gpsInitialize` terminó correctamente y la hoja conserva los seis eventos técnicos. La configuración OAuth para GitHub Pages y el transporte HTTP entre dispositivos siguen sin verificarse; no hay sincronización desde la web activa todavía.** Se conserva el modo local y todo el CSS existente. La nueva configuración está únicamente en Opciones y datos.
+La configuración pública de instalación ya está completa en `gps-google-service.js`. Se reutilizan el cliente OAuth web y el API ejecutable privado existentes; los usuarios no escriben identificadores ni claves en la app.
 
-Para conectar sin escribir identificadores, el propietario configura una sola vez los IDs públicos del cliente OAuth y del despliegue en `gps-google-service.js`. La aplicación los carga automáticamente y el usuario solo acepta la sincronización y se autentica con Google. Los navegadores que ya guardaron los IDs conservan su configuración anterior. **En este repositorio los campos de `gps-google-service.js` están vacíos**: los nuevos dispositivos siguen en modo local hasta que el propietario publique la configuración existente. No publicar tokens, contraseñas, secretos ni IDs de hojas privadas.
+1. Abre **Opciones y datos → Google Sheets privado**.
+2. Marca **Autorizo sincronizar mis ubicaciones con la hoja privada** la primera vez.
+3. Pulsa **Conectar con Google**, elige la misma cuenta propietaria y acepta los permisos cuando Google lo solicite.
+4. Comprueba el estado **Sincronizado con Google Sheets**. Los cambios posteriores se sincronizan mientras la página y la sesión estén activas. Tras recargar o vencer el token, vuelve a conectar.
 
-La activación requiere un API ejecutable y un cliente OAuth del mismo proyecto estándar de Google Cloud, una hoja privada y pruebas reales. Consulta [apps-script/README.md](apps-script/README.md) para configurar y verificar la conexión. La suite local se ejecuta con `node --test tests/sync.test.cjs`; sus servicios Google son simulados. [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el seguimiento de pendientes.
+**Comprobación real del 2026-10-31:** OAuth desde Pages, recuperación en un perfil Chrome sin IDs guardados, historial, favoritos, direcciones, sincronización repetida y recarga/reconexión. Una etiqueta manual de ensayo se guardó en la dirección del punto público de Times Square y después se restauraron exactamente sus datos originales mediante Google. Se conservaron las 21 operaciones previas más dos versiones técnicas, sin registros duplicados ni conflictos nuevos. No se capturó GPS del dispositivo ni se retiraron favoritos existentes.
 
+El historial local y las copias de seguridad se conservan. El API sigue restringido a «Solo yo»; no se publican tokens, contraseñas, secretos ni IDs de hojas privadas. Se mantienen el diseño y las funciones GPS. La prueba física en el Android del propietario y dos dispositivos simultáneos no se realizaron desde esta sesión.
+
+La suite local se ejecuta con `node --test tests/sync.test.cjs` y pasa **25/25**; sus servicios Google son simulados. Las pruebas reales y limitaciones están registradas por separado en [apps-script/README.md](apps-script/README.md). [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el estado vigente y los antecedentes.
 
 ## Desplazamiento libre
 
@@ -59,14 +65,15 @@ Toda la aplicación usa **un único desplazamiento vertical de la página**: el 
 
 ## Presentación del historial
 
-- Las ubicaciones se organizan por día y hora, en tarjetas profesionales adaptables a teléfonos pequeños.
+- Las ubicaciones se muestran en una lista cronológica de tarjetas adaptables a teléfonos pequeños, sin grupos desplegables.
 - La interfaz utiliza un **diseño compacto**: panel GPS en cuadrícula, indicadores y controles de menor altura, tarjetas de medición más bajas, distancias en línea de metadatos y acciones en una barra corta (dos filas en teléfonos). El diseño mantiene blancos táctiles de aproximadamente 40 píxeles, los cinco colores alternados, la accesibilidad y el tema oscuro.
-- Las tarjetas de registros muestran la hora sin repetir la fecha del encabezado diario; los favoritos mantienen fecha explícita.
+- Cada tarjeta de registro y favorito muestra su fecha y hora explícitas.
 - Cada tarjeta alterna entre cinco tonos suaves (verde azulado, violeta, ámbar, azul y rosa), con un borde lateral de mayor contraste y acentos en los controles. La secuencia continúa entre tarjetas consecutivas, también se aplica a favoritos, y se adapta al tema oscuro sin cambiar los datos GPS.
 - Datos principales: hora, fecha, coordenadas, precisión y distancia, con dirección cuando está disponible.
-- **Opciones** agrupa administración, modificación de dirección y eliminación, evitando nueve botones visibles en cada registro.
+- Las acciones de dirección y administración están visibles en cada tarjeta, sin menú desplegable.
 - **No se muestra ningún mapa dentro de la aplicación.** Google Maps solo se abre fuera del sistema cuando el usuario pulsa expresamente el enlace correspondiente.
 
 ## Interfaz simplificada
 
 El historial muestra directamente las tarjetas GPS ordenadas de la más reciente a la más antigua, con fecha y hora completas; no hay filtros ni grupos plegables por día/hora. Se han retirado los botones de copiar/compartir masivamente, el importador CSV por URL y la configuración de Geoapify. Siguen disponibles los botones de copiar/compartir de cada ubicación, la importación local de archivos JSON/CSV, la edición manual de direcciones y la búsqueda opcional de direcciones por Google autenticado. Los registros y favoritos existentes no se eliminan por este cambio.
+
