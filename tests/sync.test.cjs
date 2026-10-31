@@ -118,13 +118,13 @@ test('published app preserves original CSS and local key; all scripts parse',()=
   const before=cp.execFileSync('git',['show','305b4978e4f6b42c956ded42f3cf7ca29356b23d:inicio.html'],{cwd:dir,encoding:'utf8'});
   const after=fs.readFileSync(path.join(dir,'inicio.html'),'utf8');assert.equal(after.match(/<style>([\s\S]*?)<\/style>/)[1],before.match(/<style>([\s\S]*?)<\/style>/)[1]);assert.ok(after.includes("const KEY = 'gpsTrackerState'"));
   for(const match of after.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
-  for(const file of ['gps-sync.js','gps-google.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
+  for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
 });
-function adapter(s,{consent=false,httpStatus=200}={}){
-  const storage=memory();storage.setItem('gpsGoogleConfigV1',JSON.stringify({clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',consent}));storage.setItem('gpsTrackerState',JSON.stringify({days:{original:'preserved'},geoapifyKey:'local-only-secret'}));
+function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false}={}){
+  const storage=memory();storage.setItem('gpsGoogleConfigV1',JSON.stringify(withoutSavedIds?{consent}:{clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',consent}));storage.setItem('gpsTrackerState',JSON.stringify({days:{original:'preserved'},geoapifyKey:'local-only-secret'}));
   const elements=new Map(),requests=[],timers=new Map();let timer=0,revoked=false;
   function element(id){if(!elements.has(id))elements.set(id,{value:'',checked:false,textContent:'',disabled:false,listeners:{},addEventListener(name,cb){this.listeners[name]=cb;}});return elements.get(id);}
-  const win={GpsSync:require('../gps-sync.js'),addEventListener:()=>{},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:()=>options.callback({access_token:'memory-token',expires_in:3600})})}}}};
+  const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:()=>{},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:()=>options.callback({access_token:'memory-token',expires_in:3600})})}}}};
   const ctx=vm.createContext({window:win,document:{getElementById:element},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>true,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
     const request=JSON.parse(options.body);requests.push({url,options,request});
     return {ok:httpStatus===200,status:httpStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
@@ -135,6 +135,19 @@ function adapter(s,{consent=false,httpStatus=200}={}){
   return {api,storage,requests,element,diagnostics,click:id=>element(id).listeners.click(),revoked:()=>revoked};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
+test('new device uses published service configuration without entering identifiers',async()=>{
+  const s=server(),a=adapter(s,{consent:true,withoutSavedIds:true,publishedConfig:{clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890'}});
+  a.click('googleConnectBtn');await settle();
+  assert.ok(a.requests.length>=3);assert.match(a.requests[0].url,/deployment_for_test_1234567890:run$/);
+  assert.equal(a.api.connected(),true);
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../inicio.html'),'utf8');
+  assert.ok(!html.includes('id="googleClientId"'));assert.ok(!html.includes('id="googleDeploymentId"'));
+});
+test('without published or saved identifiers, no Google requests or local data migration occur',async()=>{
+  const a=adapter(server(),{consent:true,withoutSavedIds:true});a.click('googleConnectBtn');await settle();
+  assert.equal(a.requests.length,0);assert.equal(a.storage.getItem('gpsSyncBackupV1'),null);
+  assert.match(a.element('googleSyncStatus').textContent,/propietario/);
+});
 test('manual address lookup reports progress and provider errors outside hidden settings',async()=>{
   const s=server(),a=adapter(s,{consent:true});a.click('googleConnectBtn');await settle();
   await a.api.lookup(point);assert.match(a.diagnostics[0],/Consultando/);assert.match(a.diagnostics.at(-1),/guardada/);
