@@ -338,12 +338,7 @@
       <div id="records" class="tab-panel">
         <div class="records-toolbar">
           <div class="records-toolbar-heading"><strong>Historial de ubicaciones</strong><span>Consulta y gestiona los registros de tu GPS.</span></div>
-          <div class="records-filter-row">
-            <div class="field"><label for="dateSelector">Fecha</label><select id="dateSelector"><option value="all">Todas las fechas</option></select></div>
-            <div class="field"><label for="hourSelector">Hora</label><select id="hourSelector"><option value="all">Todas las horas</option></select></div>
-          </div>
         </div>
-        <div class="section-actions"><button class="btn" id="copyAllBtn" type="button">Copiar todos los datos</button><button class="btn" id="shareAllBtn" type="button">Compartir todos los datos</button></div>
         <div id="recordsList"></div>
       </div>
       <div id="favorites" class="tab-panel" hidden><div id="favoritesList"></div></div>
@@ -359,7 +354,7 @@
           </div>
           <div class="setting-box">
             <h3>Presentación</h3><label class="toggle-row"><input id="darkModeToggle" type="checkbox"> Tema oscuro</label>
-            <p>Los filtros, favoritos, intervalos y últimas coordenadas se conservan en este navegador.</p>
+            <p>Los favoritos, intervalos y últimas coordenadas se conservan en este navegador.</p>
           </div>
           <div class="setting-box">
             <h3>Exportar e importar</h3>
@@ -367,12 +362,6 @@
             <button class="btn" id="exportBtn" type="button">Descargar copia JSON</button>
             <input id="importFile" type="file" accept=".json,.csv,text/csv,application/json" aria-label="Importar historial">
             <div class="hint" id="importStatus" aria-live="polite">No se han importado archivos.</div>
-          </div>
-          <div class="setting-box">
-            <h3>Importar CSV desde una URL</h3>
-            <p>Usa solo un enlace de exportación CSV compartido por ti. No permite acceder a hojas privadas sin autorización ni requiere publicar tu hoja.</p>
-            <input id="csvUrl" type="url" placeholder="https://…/export?format=csv" aria-label="URL de CSV">
-            <button class="btn" id="syncCsvBtn" type="button">Importar CSV de la URL</button>
           </div>
           <div class="setting-box">
             <h3>Google Sheets privado (opcional)</h3>
@@ -385,9 +374,6 @@
             <button class="btn" id="googleDisconnectBtn" type="button">Desconectar y revocar acceso</button>
             <button class="btn" id="googleBackupBtn" type="button">Descargar copia anterior a la sincronización</button>
             <p id="googleSyncStatus" role="status" aria-live="polite">Sincronización desactivada.</p>
-          </div>
-          <div class="setting-box">
-            <h3>Direcciones postales (opcional)</h3><p>Sin fichas. Puedes escribir la dirección completa de cada punto o buscar una dirección aproximada con una clave propia de Geoapify, solicitada únicamente cuando pulses «Buscar dirección». Las coordenadas se envían al proveedor solo si lo autorizas.</p><label class="field" for="geoapifyKeyInput">Clave Geoapify (opcional)<input id="geoapifyKeyInput" type="password" autocomplete="off" placeholder="Clave restringida al dominio de la aplicación"></label><p>La clave se conserva solo en este navegador, no se exporta ni se incorpora a los mensajes compartidos. En aplicaciones web la clave es visible y debes restringirla por origen o referente en Geoapify.</p><button class="btn" id="saveGeoapifyBtn" type="button">Guardar configuración local</button><p>Geoapify devuelve direcciones aproximadas cuando existen; pueden faltar calles o números. Para una dirección exacta, introdúcela manualmente.</p>
           </div>
           <div class="setting-box">
             <h3>Eliminar información local</h3><p>Borra los registros y favoritos de este navegador. No modifica datos remotos ni permite recuperarlos sin una copia.</p>
@@ -423,16 +409,12 @@
         cycleDuration: Number.isFinite(num(saved.cycleDuration)) && num(saved.cycleDuration)>=30000 ? Math.min(num(saved.cycleDuration),86400000) : 300000,
         autoStart: saved.autoStart !== false,
         darkMode: !!saved.darkMode,
-        mapSelectedDate: saved.mapSelectedDate || 'all',
-        mapSelectedHour: saved.mapSelectedHour || 'all',
         showFavorites: saved.showFavorites !== false,
         accuracyLimit: Number.isFinite(num(saved.accuracyLimit)) && num(saved.accuracyLimit)>=5 && num(saved.accuracyLimit)<=5000 ? num(saved.accuracyLimit) : 100,
         addresses: saved.addresses && typeof saved.addresses==='object' && !Array.isArray(saved.addresses) ? saved.addresses : {},
-        geoapifyKey: typeof saved.geoapifyKey==='string' ? saved.geoapifyKey : '',
         legacyDetails: saved.locationDetails && typeof saved.locationDetails==='object' ? saved.locationDetails : null,
         currentFix: null, selectedMeasure: null,
         mapView: saved.mapView || null,
-        csvUrl: saved.csvUrl || '',
         isRunning: false
       };
       // Conservar las direcciones escritas en versiones anteriores al retirar las fichas.
@@ -463,9 +445,8 @@
           localStorage.setItem(KEY, JSON.stringify({
             days:state.days,favorites:state.favorites,lastLocation:state.lastLocation,
             cycleDuration:state.cycleDuration,autoStart:state.autoStart,darkMode:state.darkMode,
-            mapSelectedDate:state.mapSelectedDate,mapSelectedHour:state.mapSelectedHour,
-            showFavorites:state.showFavorites,mapView:state.mapView,csvUrl:state.csvUrl,
-            accuracyLimit:state.accuracyLimit,addresses:state.addresses,geoapifyKey:state.geoapifyKey,
+            showFavorites:state.showFavorites,mapView:state.mapView,
+            accuracyLimit:state.accuracyLimit,addresses:state.addresses,
             ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}),
             cyclesCompleted:allLocations().length
           }));
@@ -591,25 +572,6 @@
         const link=document.createElement('a');link.href=mapLink(state.lastLocation);link.target='_blank';link.rel='noopener noreferrer';link.textContent=addressOf(state.lastLocation)||formatCoords(state.lastLocation);
         loc.append(link,document.createElement('br'),document.createTextNode(fmtTime(state.lastLocation.timestamp)));
       }
-      function fillSelect(select,choices,wanted) {
-        select.replaceChildren();
-        choices.forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;select.append(o);});
-        select.value=choices.some(([v])=>v===wanted)?wanted:'all';
-        return select.value;
-      }
-      function renderFilters() {
-        const locations=allLocations();
-        const dates=[...new Set(locations.map((p)=>dateKey(p.timestamp)))].sort().reverse();
-        const dateOptions=[['all','Todas las fechas'],...dates.map((d)=>[d,d+' ('+locations.filter((p)=>dateKey(p.timestamp)===d).length+')'])];
-        state.mapSelectedDate=fillSelect(el('dateSelector'),dateOptions,state.mapSelectedDate);
-        const filtered=locations.filter((p)=>state.mapSelectedDate==='all'||dateKey(p.timestamp)===state.mapSelectedDate);
-        const hours=[...new Set(filtered.map((p)=>hourKey(p.timestamp)))].sort((a,b)=>num(a)-num(b));
-        const hourOptions=[['all','Todas las horas'],...hours.map((h)=>[h,h.padStart(2,'0')+':00 ('+filtered.filter((p)=>hourKey(p.timestamp)===h).length+')'])];
-        state.mapSelectedHour=fillSelect(el('hourSelector'),hourOptions,state.mapSelectedHour);
-      }
-      function filteredLocations() {
-        return allLocations().filter((p)=>(state.mapSelectedDate==='all'||dateKey(p.timestamp)===state.mapSelectedDate)&&(state.mapSelectedHour==='all'||hourKey(p.timestamp)===state.mapSelectedHour));
-      }
       // Distancia geodésica aproximada en línea recta. No es distancia por carretera.
       function haversine(a,b){
         const r=Math.PI/180,lat1=a.latitude*r,lat2=b.latitude*r,dl=(b.latitude-a.latitude)*r,dn=(b.longitude-a.longitude)*r;
@@ -631,29 +593,11 @@
       }
       async function lookupAddress(p){
         if(cloud&&cloud.connected()){await cloud.lookup(p);return;}
-        if(!state.geoapifyKey){
-          const message='Para buscar la dirección, pulsa Conectar con Google y autoriza la sesión. Reconectar también recupera el historial remoto. Puedes usar una clave Geoapify propia o Editar dirección como alternativas.';
-          setDiagnostic(message);
-          document.querySelector('[data-tab="settings"]').click();
-          el('googleSyncStatus').textContent=message;
-          el('googleConnectBtn').focus();
-          el('googleConnectBtn').scrollIntoView({block:'center',behavior:'smooth'});
-          return;
-        }
-        const k=addressKey(p),button=el('saveGeoapifyBtn');
-        button.disabled=true;setDiagnostic('Consultando dirección aproximada de las coordenadas…');
-        try{
-          const url='https://api.geoapify.com/v1/geocode/reverse?lat='+encodeURIComponent(p.latitude)+'&lon='+encodeURIComponent(p.longitude)+'&lang=es&format=geojson&apiKey='+encodeURIComponent(state.geoapifyKey);
-          const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
-          let res;try{res=await fetch(url,{signal:controller.signal,credentials:'omit',referrerPolicy:'strict-origin-when-cross-origin'});}finally{clearTimeout(timeout);}
-          if(!res.ok)throw Error('No se pudo consultar el proveedor (HTTP '+res.status+'). Comprueba la clave y sus restricciones.');
-          const info=await res.json(),prop=info&&info.features&&info.features[0]&&info.features[0].properties;
-          const address=prop&&String(prop.formatted||'').trim().slice(0,250);
-          if(!address)throw Error('No se encontró una dirección para estas coordenadas. Puedes escribir una manual.');
-          state.addresses[k]={address,source:'Geoapify (aproximada)'};
-          store();renderAll();setDiagnostic('Dirección aproximada encontrada: '+address+'. Verifica número y calle antes de compartir.');
-        }catch(err){setDiagnostic('Dirección no disponible: '+err.message);}
-        finally{button.disabled=false;}
+        const message='Para consultar una dirección aproximada, conecta con Google desde Opciones y datos. También puedes usar Editar dirección para escribirla manualmente.';
+        setDiagnostic(message);
+        document.querySelector('[data-tab="settings"]').click();
+        el('googleSyncStatus').textContent=message;
+        el('googleConnectBtn').focus();
       }
       async function measureFromHere(target=null){
         const b=el('measureBtn');b.disabled=true;b.textContent='Midiendo ubicación…';setDiagnostic('Obteniendo ubicación actual para calcular distancias en línea recta…');
@@ -700,17 +644,6 @@
         try{if(navigator.share){await navigator.share({title:'Ubicación GPS',text});setDiagnostic('Datos enviados al menú de compartir.');}else{await copyLocation(p);}}
         catch(err){if(err.name!=='AbortError')setDiagnostic('Error al compartir: '+err.message);}
       }
-      function allData(){const a=allLocations(),fav=state.favorites.filter(valid);return ['CONTROL GPS · DATOS COMPARTIDOS','Registros: '+a.length+' · Favoritos: '+fav.length,'','REGISTROS',...a.map((p,i)=>'\n#'+(i+1)+'\n'+dataFor(p)),'','FAVORITOS',...fav.map((p,i)=>'\n★ '+(i+1)+'\n'+dataFor(p))].join('\n');}
-      function htmlAll(){const records=allLocations(),favorites=state.favorites.filter(valid);return '<div style="font:14px/1.6 system-ui,sans-serif"><strong>CONTROL GPS · DATOS COMPARTIDOS</strong><h3>Registros</h3>'+records.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'<h3>Favoritos</h3>'+favorites.map(p=>'<section style="margin:14px 0;padding:10px;border:1px solid #ccd">'+htmlFor(p)+'</section>').join('')+'</div>';}
-      async function copyAll(){try{await copyText(allData(),htmlAll());setDiagnostic('Todos los registros y favoritos copiados con sus enlaces de Google Maps. Solo se incluyen direcciones ya guardadas.');}catch(err){setDiagnostic('Error al copiar todo: '+err.message);}}
-      async function shareAll(){
-        const content=allData();
-        try{if(navigator.share){await navigator.share({title:'Historial Control GPS',text:content});setDiagnostic('Historial enviado al menú de compartir.');}
-          else await copyAll();}
-        catch(err){if(err.name!=='AbortError')setDiagnostic('No se pudo compartir el historial: '+err.message+'; prueba Copiar todos los datos.');}
-      }
-
-
       // Botones compactos del popup de Leaflet (las tarjetas usan location-action).
       function btn(text,action,danger=false){
         const b=document.createElement('button');b.type='button';b.textContent=text;b.className='mini'+(danger?' danger':'');
@@ -754,23 +687,9 @@
         const a=document.createElement('a');a.className='location-action';a.href=url;a.target='_blank';a.rel='noopener noreferrer';
         a.append(uiIcon(icon),uiText('span',label));return a;
       }
-      function groupHeading(summary,title,count,label,icon){
-        summary.append(
-          (()=>{
-            const block=document.createElement('span');block.className='group-summary-main';
-            block.append(uiIcon(icon),uiText('span',title));return block;
-          })(),
-          (()=>{
-            const block=document.createElement('span');block.className='summary-meta';
-            block.append(uiText('span',count+' '+label,'group-summary-count'));
-            const arrow=document.createElement('span');arrow.className='group-summary-chevron';arrow.append(uiIcon('chevron'));block.append(arrow);return block;
-          })()
-        );
-      }
       function locationCard(p,isFavorite=false,colorIndex=0){
         const card=document.createElement('article');card.className='location-card';
-        // Asignación consecutiva entre grupos de horas y días; los favoritos
-        // utilizan su propia serie de colores.
+        // Asignación consecutiva en el historial; favoritos usan su propia serie de colores.
         const tones=['teal','purple','amber','blue','rose'];
         card.dataset.tone=tones[colorIndex%tones.length];
         const top=document.createElement('div');top.className='location-card-top';
@@ -782,8 +701,8 @@
         const favoriteLabel=String(p.label||'').trim();
         title.textContent=isFavorite&&favoriteLabel&&favoriteLabel!==fmtTime(p.timestamp)?favoriteLabel:new Date(p.timestamp).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit',second:'2-digit'});
         heading.append(title);
-        // En el historial la fecha ya se presenta en el grupo. En favoritos sí hace falta.
-        if(isFavorite)heading.append(uiText('div',new Date(p.timestamp).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}),'location-subtitle'));
+        // La lista es plana, por lo que cada ubicación muestra su fecha.
+        heading.append(uiText('div',new Date(p.timestamp).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}),'location-subtitle'));
         identity.append(pin,heading);
         const quality=document.createElement('span');quality.className='location-accuracy';
         quality.append(uiIcon('target'),uiText('span',Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'Precisión desconocida'));
@@ -847,30 +766,16 @@
 
       function renderRecords() {
         const root=el('recordsList');
-        const openState=new Map();
-        root.querySelectorAll('details[data-group-key]').forEach(d=>openState.set(d.dataset.groupKey,d.open));
         root.replaceChildren();
-        const locations=filteredLocations().reverse();
-        if(!locations.length) {const m=document.createElement('div');m.className='empty';m.textContent=allLocations().length?'No existen registros para estos filtros. Cambia la fecha u hora.':'Sin registros. Activa el seguimiento, registra una posición o importa un historial.';root.append(m);return;}
-        const dates=[...new Set(locations.map(p=>dateKey(p.timestamp)))];
-        let colorIndex=0;
-        dates.forEach(dk=>{
-          const group=document.createElement('details');group.className='group';group.dataset.groupKey='d:'+dk;
-          group.open=openState.has(group.dataset.groupKey)?openState.get(group.dataset.groupKey):dates.length<5;
-          const summary=document.createElement('summary'),dayLocations=locations.filter(p=>dateKey(p.timestamp)===dk);
-          const formattedDay=new Date(dk+'T12:00:00').toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-          groupHeading(summary,formattedDay,dayLocations.length,dayLocations.length===1?'ubicación':'ubicaciones','calendar');
-          group.append(summary);
-          const hours=[...new Set(dayLocations.map(p=>hourKey(p.timestamp)))].sort((a,b)=>num(b)-num(a));
-          hours.forEach(hk=>{
-            const sub=document.createElement('details');sub.className='subgroup';sub.dataset.groupKey='h:'+dk+':'+hk;
-            sub.open=openState.has(sub.dataset.groupKey)?openState.get(sub.dataset.groupKey):hours.length<4;
-            const head=document.createElement('summary'),list=dayLocations.filter(p=>hourKey(p.timestamp)===hk);
-            groupHeading(head,hk.padStart(2,'0')+':00',list.length,list.length===1?'registro':'registros','clock');
-            sub.append(head);list.forEach(p=>sub.append(locationCard(p,false,colorIndex++)));group.append(sub);
-          });
-          root.append(group);
-        });
+        const locations=allLocations().slice().reverse();
+        if(!locations.length){
+          const message=document.createElement('div');
+          message.className='empty';
+          message.textContent='Sin registros. Activa el seguimiento, registra una posición o importa un historial.';
+          root.append(message);
+          return;
+        }
+        locations.forEach((p,i)=>root.append(locationCard(p,false,i)));
       }
       function renderFavorites(){
         const root=el('favoritesList');root.replaceChildren();
@@ -878,7 +783,7 @@
         if(!favs.length){const m=document.createElement('div');m.className='empty';m.textContent='Todavía no hay favoritos.';root.append(m);return;}
         favs.forEach((p,i)=>root.append(locationCard(p,true,i)));
       }
-      function renderAll() {renderStatus();renderFilters();renderRecords();renderFavorites();}
+      function renderAll() {renderStatus();renderRecords();renderFavorites();}
       function parseCsv(text) {
         const first=(text.replace(/^\uFEFF/,'').split(/\r?\n/,1)[0]||'');
         const delimiter=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?';':',';
@@ -968,10 +873,6 @@
       el('captureBtn').addEventListener('click',()=>capture('history'));
       el('favoriteBtn').addEventListener('click',()=>capture('favorite'));
       el('measureBtn').addEventListener('click',()=>measureFromHere());
-      el('copyAllBtn').addEventListener('click',()=>copyAll());
-      el('shareAllBtn').addEventListener('click',()=>shareAll());
-      el('dateSelector').addEventListener('change',(e)=>{state.mapSelectedDate=e.target.value;state.mapSelectedHour='all';renderFilters();renderRecords();store();});
-      el('hourSelector').addEventListener('change',(e)=>{state.mapSelectedHour=e.target.value;renderRecords();store();});
       el('cycleDurationInput').value=String(Math.round(state.cycleDuration/1000));
       el('cycleDurationInput').addEventListener('change',(e)=>{
         const v=Number(e.target.value);
@@ -981,8 +882,6 @@
       });
       el('accuracyLimitInput').value=String(state.accuracyLimit);
       el('accuracyLimitInput').addEventListener('change',(ev)=>{const value=Number(ev.target.value);if(!Number.isFinite(value)||value<5||value>5000){ev.target.value=String(state.accuracyLimit);setDiagnostic('El error GPS máximo debe estar entre 5 y 5.000 metros.');return;}state.accuracyLimit=value;store();setDiagnostic('Precisión mínima ajustada: solo se guardan posiciones con error de ±'+value+' m o menor.');});
-      el('geoapifyKeyInput').value=state.geoapifyKey;
-      el('saveGeoapifyBtn').addEventListener('click',()=>{state.geoapifyKey=el('geoapifyKeyInput').value.trim();store();setDiagnostic(state.geoapifyKey?'Clave de consulta postal guardada en este navegador.':'Consulta postal automática desactivada.');});
       el('autoStartToggle').addEventListener('change',(e)=>{if(e.target.checked){startTracking();}else{stopTracking();}});
       el('darkModeToggle').checked=state.darkMode;
       document.body.classList.toggle('dark-mode',state.darkMode);
@@ -994,22 +893,10 @@
         catch(err){el('importStatus').textContent='No se pudo importar: '+err.message;setDiagnostic('El archivo no tiene un formato válido.');}
         e.target.value='';
       });
-      el('csvUrl').value=state.csvUrl;
-      el('csvUrl').addEventListener('change',(e)=>{state.csvUrl=e.target.value.trim();store();});
-      el('syncCsvBtn').addEventListener('click',async()=>{
-        const url=el('csvUrl').value.trim();if(!/^https:\/\//i.test(url)){setDiagnostic('Se requiere una URL HTTPS de un CSV accesible.');return;}
-        state.csvUrl=url;store();el('syncCsvBtn').disabled=true;setDiagnostic('Descargando CSV…');
-        try {
-          const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
-          try {const response=await fetch(url,{signal:controller.signal,credentials:'omit'});if(!response.ok)throw new Error('HTTP '+response.status);await importText(await response.text(),false);}
-          finally {clearTimeout(timer);}
-        } catch(err){setDiagnostic('No se pudo acceder al CSV. Comprueba permisos públicos, CORS y la URL; alternativamente, impórtalo como archivo.');}
-        finally {el('syncCsvBtn').disabled=false;}
-      });
       el('clearBtn').addEventListener('click',()=>{
         if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
         if(cloud&&!cloud.prepareLocalClear())return;
-        state.days={};state.favorites=[];state.addresses={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;state.mapSelectedDate='all';state.mapSelectedHour='all';
+        state.days={};state.favorites=[];state.addresses={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;
         store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();});
