@@ -55,14 +55,14 @@ La activación requiere un API ejecutable y un cliente OAuth del mismo proyecto 
 
 ## Desplazamiento libre
 
-Toda la aplicación usa **un único desplazamiento vertical de la página**: el panel de seguimiento, el historial, favoritos y opciones se mueven naturalmente al deslizar. No hay paneles fijos o inmovilizados, ni límites de altura que obliguen a desplazar una lista interna. El historial mantiene el diseño compacto, los colores alternados y los grupos expandibles por día y hora.
+Toda la aplicación usa **un único desplazamiento vertical de la página**: el panel de seguimiento, el historial, favoritos y opciones se mueven naturalmente al deslizar. No hay paneles fijos o inmovilizados, ni límites de altura que obliguen a desplazar una lista interna. El historial mantiene el diseño compacto y los colores alternados, con tarjetas visibles directamente sin grupos expandibles.
 
 ## Presentación del historial
 
 - Las ubicaciones se organizan por día y hora, en tarjetas profesionales adaptables a teléfonos pequeños.
 - La interfaz utiliza un **diseño compacto**: panel GPS en cuadrícula, indicadores y controles de menor altura, tarjetas de medición más bajas, distancias en línea de metadatos y acciones en una barra corta (dos filas en teléfonos). El diseño mantiene blancos táctiles de aproximadamente 40 píxeles, los cinco colores alternados, la accesibilidad y el tema oscuro.
 - Las tarjetas de registros muestran la hora sin repetir la fecha del encabezado diario; los favoritos mantienen fecha explícita.
-- Cada tarjeta alterna entre cinco tonos suaves (verde azulado, violeta, ámbar, azul y rosa), con un borde lateral de mayor contraste y acentos en los controles. La secuencia continúa entre grupos de horas y fechas, también se aplica a favoritos, y se adapta al tema oscuro sin cambiar los datos GPS.
+- Cada tarjeta alterna entre cinco tonos suaves (verde azulado, violeta, ámbar, azul y rosa), con un borde lateral de mayor contraste y acentos en los controles. La secuencia continúa entre tarjetas consecutivas, también se aplica a favoritos, y se adapta al tema oscuro sin cambiar los datos GPS.
 - Datos principales: hora, fecha, coordenadas, precisión y distancia, con dirección cuando está disponible.
 - **Opciones** agrupa administración, modificación de dirección y eliminación, evitando nueve botones visibles en cada registro.
 - **No se muestra ningún mapa dentro de la aplicación.** Google Maps solo se abre fuera del sistema cuando el usuario pulsa expresamente el enlace correspondiente.
