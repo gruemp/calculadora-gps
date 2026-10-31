@@ -377,11 +377,7 @@
           <div class="setting-box">
             <h3>Google Sheets privado (opcional)</h3>
             <p>La conexión requiere un servicio autorizado. Envía historial, favoritos y direcciones a la hoja privada de tu cuenta. La copia local se conserva y se respalda antes de sincronizar. Los cambios de favoritos y direcciones se propagan; eliminar registros del historial sigue siendo solo local. Las versiones anteriores permanecen en la hoja.</p>
-            <details><summary>Configurar conexión de Google</summary>
-              <label class="field" for="googleClientId">ID de cliente OAuth<input id="googleClientId" type="text" autocomplete="off" placeholder="…apps.googleusercontent.com"></label>
-              <label class="field" for="googleDeploymentId">ID del despliegue API ejecutable<input id="googleDeploymentId" type="text" autocomplete="off" placeholder="ID de implementación, sin URL"></label>
-              <p>Usa los identificadores del servicio configurado por el propietario. No introduzcas contraseñas, claves privadas ni tokens.</p>
-            </details>
+            <p>La conexión se configura automáticamente desde el servicio de Control GPS. No necesitas introducir códigos. Google te pedirá seleccionar tu cuenta y autorizar el acceso.</p>
             <label class="toggle-row"><input id="googleConsent" type="checkbox"> Autorizo sincronizar mis ubicaciones con la hoja privada</label>
             <label class="toggle-row"><input id="googleAutoAddress" type="checkbox"> Consultar en Google la dirección aproximada de nuevas capturas (máximo una por minuto y 20 por sesión)</label>
             <button class="btn" id="googleConnectBtn" type="button">Conectar con Google</button>
@@ -404,6 +400,7 @@
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
   <script src="gps-sync.js"></script>
+  <script src="gps-google-service.js"></script>
   <script src="gps-google.js"></script>
   <script>
     (function () {
