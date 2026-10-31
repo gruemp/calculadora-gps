@@ -767,7 +767,7 @@
       function renderRecords() {
         const root=el('recordsList');
         root.replaceChildren();
-        const locations=allLocations().slice().reverse();
+        const locations=allLocations().slice().sort((a,b)=>b.timestamp-a.timestamp);
         if(!locations.length){
           const message=document.createElement('div');
           message.className='empty';
