@@ -16,7 +16,7 @@
     });
     return gisLoading;
   }
-  function init({snapshot,apply,save,render,diagnostic}){
+  function init({snapshot,apply,clearHistoryBefore,save,render,diagnostic}){
     const $=id=>document.getElementById(id);
     let config;try{config=JSON.parse(localStorage.getItem(CONFIG)||'{}');}catch{config={};}
     const published=root.CONTROL_GPS_GOOGLE_SERVICE||{};
@@ -24,11 +24,11 @@
     const chosen=validService(published.clientId,published.deploymentId)?published:
       validService(config.clientId,config.deploymentId)?config:null;
     const service=chosen?{clientId:chosen.clientId.trim(),deploymentId:chosen.deploymentId.trim()}:null;
-    let token='',expires=0,engine=null,applying=false,timer,attempts=0,epoch=0,geoAt=0,geoCount=0,geoBusy=false,tabRelease;
+    let token='',expires=0,engine=null,applying=false,timer,attempts=0,epoch=0,geoAt=0,geoCount=0,geoBusy=false,clearing=false,tabRelease;
     function status(message){$('googleSyncStatus').textContent=message+(engine?.data.audit.length?' Conflictos conservados: '+engine.data.audit.length+'.':'');}
     function persistConfig(){localStorage.setItem(CONFIG,JSON.stringify(config));}
     function stop(message='Sincronización detenida. Datos locales conservados.'){
-      epoch++;token='';expires=0;clearTimeout(timer);engine?.stop();if(tabRelease){tabRelease();tabRelease=null;}status(message);$('googleConnectBtn').disabled=false;
+      epoch++;token='';expires=0;clearTimeout(timer);engine?.stop();if(tabRelease){tabRelease();tabRelease=null;}status(message);$('googleConnectBtn').disabled=false;$('googleClearHistoryBtn').disabled=true;
     }
     function retry(delay=1500){clearTimeout(timer);if(token&&engine?.ready)timer=setTimeout(run,delay);}
     async function send(request){
@@ -44,13 +44,18 @@
       const operation=await res.json();
       if(operation.error){
         const detail=operation.error.details?.[0]?.errorMessage||'';
-        throw Object.assign(Error(detail.startsWith('GPS_')?detail:'No se pudo ejecutar el servicio. Revisa el despliegue en Apps Script.'),{permanent:detail!=='GPS_BUSY'&&!/quota|too many|rate|timed out/i.test(detail)});
+        const messages={GPS_FORBIDDEN:'Esta acción requiere la cuenta propietaria de la hoja.',GPS_CLIENT_UPDATE_REQUIRED:'Hay una versión nueva. Recarga Control GPS antes de conectar.',
+          GPS_RECORD_BEFORE_CLEAR:'Los registros anteriores al último borrado no se vuelven a subir.',
+          GPS_CLEAR_CHANGED:'Los datos cambiaron durante la confirmación. Revisa el historial y vuelve a intentarlo.',
+          GPS_CLEAR_CONFIRMATION_REQUIRED:'La confirmación del borrado venció o no es válida. Vuelve a iniciarlo.',
+          GPS_HISTORY_RESET:'El historial cambió en otro dispositivo. Sincroniza antes de volver a confirmar.'};
+        throw Object.assign(Error(messages[detail]||(detail.startsWith('GPS_')?detail:'No se pudo ejecutar el servicio. Revisa el despliegue en Apps Script.')),{permanent:detail!=='GPS_BUSY'&&!/quota|too many|rate|timed out/i.test(detail)});
       }
       if(operation.done!==true||!operation.response?.result)throw Error('Google no confirmó la operación. Se reintentará con el mismo identificador.');
       return operation.response.result;
     }
     async function run(){
-      clearTimeout(timer);if(!engine?.ready)return;
+      clearTimeout(timer);if(!engine?.ready||clearing)return;
       try{await engine.sync();attempts=0;retry(engine.data.pending.length?1500:60000);}
       catch(error){
         if(error.permanent){stop(error.message);return;}
@@ -77,7 +82,19 @@
         });
         if(!acquired)throw Error('Ya hay otra pestaña sincronizando. Desconéctala primero.');
         if(session!==epoch){if(tabRelease){tabRelease();tabRelease=null;}return;}
-        engine=new root.GpsSync.Engine({storage:localStorage,send,status,apply:async events=>{
+        engine=new root.GpsSync.Engine({storage:localStorage,send,status,resetHistory:async(cutoff,generation)=>{
+          const current=snapshot();
+          if(!Object.values(current).some(e=>e.kind==='record'&&e.value.timestamp<=cutoff))return;
+          if(typeof clearHistoryBefore!=='function')throw Object.assign(Error('Recarga la aplicación para reflejar el borrado del historial.'),{permanent:true});
+          const backupKey='gpsHistoryBeforeClearV1:'+generation;
+          try{
+            if(!localStorage.getItem(backupKey))localStorage.setItem(backupKey,localStorage.getItem('gpsTrackerState')||'{}');
+            localStorage.setItem('gpsHistoryLastBackupV1',backupKey);$('googleHistoryBackupBtn').disabled=false;
+          }catch{throw Object.assign(Error('No se pudo guardar una copia local antes de reflejar el borrado. Exporta tus datos y vuelve a conectar.'),{permanent:true});}
+          applying=true;
+          try{clearHistoryBefore(cutoff);if(save()===false)throw Error('No se pudo guardar el historial actualizado.');render();}
+          finally{applying=false;}
+        },apply:async events=>{
           applying=true;try{apply(events);if(save()===false)throw Error('No se pudo conservar la lectura en el almacenamiento local.');render();}finally{applying=false;}
         }});
         await engine.bind();
@@ -85,6 +102,7 @@
         if(!localStorage.getItem(root.GpsSync.BACKUP))localStorage.setItem(root.GpsSync.BACKUP,localStorage.getItem('gpsTrackerState')||'{}');
         // Every state transfer starts with a persisted backup and durable queue.
         engine.observe(snapshot());persistConfig();$('googleConnectBtn').disabled=true;
+        $('googleClearHistoryBtn').disabled=!engine.features.clearHistory;
         status('Cuenta autorizada. Sincronizando…');await run();
       }catch(error){stop('No conectado: '+error.message);}
     }
@@ -117,13 +135,40 @@
       if(previous&&root.google?.accounts?.oauth2)root.google.accounts.oauth2.revoke(previous,()=>{});
     });
     $('googleSyncBtn').addEventListener('click',()=>{if(engine?.ready)run();else status('Configura el servicio y conecta con Google primero.');});
-    $('googleBackupBtn').addEventListener('click',()=>{
-      const raw=localStorage.getItem(root.GpsSync.BACKUP);if(!raw){status('Todavía no se ha iniciado ninguna migración.');return;}
+    $('googleClearHistoryBtn').disabled=true;
+    $('googleClearHistoryBtn').addEventListener('click',async()=>{
+      if(!engine?.ready||!engine.features.clearHistory){status('Conecta con Google para borrar el historial de la hoja.');return;}
+      if(engine.busy||clearing||geoBusy){status('Espera a que termine la operación actual.');return;}
+      clearing=true;clearTimeout(timer);$('googleClearHistoryBtn').disabled=true;
+      try{
+        await engine.sync();
+        const plan=await engine.request({action:'prepareHistoryClear'});
+        if(!plan.ticket||!Number.isSafeInteger(plan.records))throw Error('No se pudo preparar el borrado.');
+        if(!confirm('¿Borrar definitivamente '+plan.records+' registros GPS y sus '+plan.recordEvents+' versiones de Google Sheets? Se conservarán los favoritos y las direcciones. El historial anterior a este borrado también se retirará de los navegadores al reconectar. Las copias de seguridad no se borran.')){
+          status('Borrado cancelado. El historial se conserva.');return;
+        }
+        if(prompt('Para confirmar el borrado remoto, escribe BORRAR HISTORIAL:')!=='BORRAR HISTORIAL'){
+          status('Borrado cancelado. El historial se conserva.');return;
+        }
+        const result=await engine.clearHistory(plan.ticket);
+        status('Historial borrado en Google Sheets y este navegador. Favoritos y direcciones conservados.');
+        diagnostic('Se borraron '+result.removedRecords+' registros GPS de la hoja. Los favoritos y las direcciones se conservaron.');
+      }catch(error){
+        status('Borrado no confirmado: '+error.message+' Sincroniza para comprobar el estado antes de repetirlo.');
+      }finally{
+        clearing=false;$('googleClearHistoryBtn').disabled=!engine?.ready;retry(1500);
+      }
+    });
+    function downloadBackup(raw,filename){
+      if(!raw){status('Todavía no hay una copia guardada.');return;}
       try{const data=JSON.parse(raw);delete data.geoapifyKey;delete data.csvUrl;
         const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');
-        a.href=url;a.download='control-gps-antes-de-sincronizar.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+        a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }catch{status('No se pudo descargar la copia. Los datos locales se conservan.');}
-    });
+    }
+    $('googleBackupBtn').addEventListener('click',()=>downloadBackup(localStorage.getItem(root.GpsSync.BACKUP),'control-gps-antes-de-sincronizar.json'));
+    $('googleHistoryBackupBtn').disabled=!localStorage.getItem('gpsHistoryLastBackupV1');
+    $('googleHistoryBackupBtn').addEventListener('click',()=>downloadBackup(localStorage.getItem(localStorage.getItem('gpsHistoryLastBackupV1')),'control-gps-antes-de-borrar-historial.json'));
     window.addEventListener('online',()=>retry(1000));
     window.addEventListener('storage',event=>{if(event.key==='gpsTrackerState'&&token)stop('Otra pestaña modificó los datos locales. Recarga esta página antes de reconectar.');});
     async function lookup(p,automatic=false){
@@ -163,3 +208,4 @@
   }
   root.GpsGoogle={init};
 })(window);
+

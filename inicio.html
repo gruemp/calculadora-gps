@@ -365,7 +365,7 @@
           </div>
           <div class="setting-box">
             <h3>Google Sheets privado (opcional)</h3>
-            <p>La conexión requiere un servicio autorizado. Envía historial, favoritos y direcciones a la hoja privada de tu cuenta. La copia local se conserva y se respalda antes de sincronizar. Los cambios de favoritos y direcciones se propagan; eliminar registros del historial sigue siendo solo local. Las versiones anteriores permanecen en la hoja.</p>
+            <p>La conexión requiere un servicio autorizado. Envía historial, favoritos y direcciones a la hoja privada de tu cuenta. La copia local se conserva y se respalda antes de sincronizar. Los cambios de favoritos y direcciones se propagan. Eliminar una tarjeta sigue siendo solo local; el botón de borrado remoto elimina todo el historial GPS de la hoja con confirmación.</p>
             <p>La conexión se configura automáticamente desde el servicio de Control GPS. No necesitas introducir códigos. Google te pedirá seleccionar tu cuenta y autorizar el acceso.</p>
             <label class="toggle-row"><input id="googleConsent" type="checkbox"> Autorizo sincronizar mis ubicaciones con la hoja privada</label>
             <label class="toggle-row"><input id="googleAutoAddress" type="checkbox"> Consultar en Google la dirección aproximada de nuevas capturas (máximo una por minuto y 20 por sesión)</label>
@@ -373,6 +373,9 @@
             <button class="btn" id="googleSyncBtn" type="button">Sincronizar ahora</button>
             <button class="btn" id="googleDisconnectBtn" type="button">Desconectar y revocar acceso</button>
             <button class="btn" id="googleBackupBtn" type="button">Descargar copia anterior a la sincronización</button>
+            <p>El borrado remoto elimina los registros GPS y sus versiones de la hoja y del historial de este navegador. Conserva favoritos, direcciones y copias de seguridad. Los demás dispositivos reflejarán el borrado al reconectar.</p>
+            <button class="btn btn-danger" id="googleClearHistoryBtn" type="button" disabled>Borrar historial de Google Sheets</button>
+            <button class="btn" id="googleHistoryBackupBtn" type="button" disabled>Descargar copia anterior al borrado</button>
             <p id="googleSyncStatus" role="status" aria-live="polite">Sincronización desactivada.</p>
           </div>
           <div class="setting-box">
@@ -385,9 +388,9 @@
     </section>
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
-  <script src="gps-sync.js"></script>
+  <script src="gps-sync.js?v=20261031-history-clear"></script>
   <script src="gps-google-service.js"></script>
-  <script src="gps-google.js"></script>
+  <script src="gps-google.js?v=20261031-history-clear"></script>
   <script>
     (function () {
       'use strict';
@@ -919,6 +922,12 @@
                 if(p.address)state.addresses[k]={...p};else delete state.addresses[k];
               }
             }
+          },clearHistoryBefore:cutoff=>{
+            for(const day of Object.values(state.days))for(const bucket of Object.values(day.hours||{})){
+              if(Array.isArray(bucket.locations))bucket.locations=bucket.locations.filter(p=>Number(p.timestamp)>cutoff);
+            }
+            const remaining=allLocations();
+            state.lastLocation=remaining.length?remaining[remaining.length-1]:null;
           },save:store,render:()=>renderAll(true),diagnostic:setDiagnostic
         });
       }
@@ -929,3 +938,4 @@
   </script>
 </body>
 </html>
+

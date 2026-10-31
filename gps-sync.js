@@ -17,24 +17,38 @@
     return result;
   }
   class Engine{
-    constructor({storage,send,apply,status=()=>{},uuid=()=>crypto.randomUUID()}){
-      Object.assign(this,{storage,send,apply,status,uuid});
+    constructor({storage,send,apply,resetHistory=async()=>{},status=()=>{},uuid=()=>crypto.randomUUID()}){
+      Object.assign(this,{storage,send,apply,resetHistory,status,uuid});
       this.data=JSON.parse(storage.getItem(KEY)||'null')||{version:1,device:uuid(),cursor:0,observed:{},pending:[],revisions:{},audit:[]};
       const seen=new Set();
       this.data.audit=this.data.audit.filter(event=>{const id=conflictId(event);if(seen.has(id))return false;seen.add(id);return true;});
       this.busy=false;this.ready=false;
     }
     persist(){this.storage.setItem(KEY,JSON.stringify(this.data));}
+    request(request){return this.send({...request,clientVersion:2,historyEpoch:this.data.historyEpoch||'initial'});}
+    async acceptHistory(info){
+      const epoch=info.historyEpoch||'initial',cutoff=Number(info.historyClearedAt)||0;
+      if(typeof epoch!=='string'||!Number.isSafeInteger(cutoff)||cutoff<0)throw Error('Estado de borrado remoto inválido.');
+      const changed=this.data.historyEpoch?this.data.historyEpoch!==epoch:epoch!=='initial';
+      // Keep captures made after the clear. Old offline history must not resurrect.
+      if(cutoff)await this.resetHistory(cutoff,epoch);
+      this.data.pending=this.data.pending.filter(p=>p.kind!=='record'||p.value.timestamp>cutoff);
+      this.data.observed=Object.fromEntries(Object.entries(this.data.observed).filter(([,e])=>e.kind!=='record'||e.value.timestamp>cutoff));
+      if(changed){this.data.cursor=0;this.data.revisions={};this.data.audit=this.data.audit.filter(e=>e.kind!=='record');}
+      this.data.historyEpoch=epoch;this.data.historyClearedAt=cutoff;this.persist();
+    }
     async bind(){
-      const health=await this.send({action:'status'});
+      const health=await this.request({action:'status'});
       if(health?.service!=='control-gps'||health.version!==1||!health.dataset||!health.actor)throw Error('Servicio incompatible.');
       const binding=health.dataset+'|'+health.actor;
       if(this.data.binding&&this.data.binding!==binding)throw Error('La cuenta o la hoja no coincide con la conexión anterior. Conserva la copia y usa otro perfil del navegador.');
+      await this.acceptHistory(health);this.features=health.features||{};
       this.data.binding=binding;this.persist();this.ready=true;return health;
     }
     observe(current){
       if(!this.ready)return;
       const before=this.data.observed;
+      current=Object.fromEntries(Object.entries(current).filter(([,e])=>e.kind!=='record'||e.value.timestamp>(this.data.historyClearedAt||0)));
       for(const [id,entity] of Object.entries(current)){
         if(!same(before[id],entity))this.queue(id,entity);
       }
@@ -57,7 +71,8 @@
         await this.pull();
         for(let count=0;this.ready&&this.data.pending.length&&count<20;count++){
           const batch=this.data.pending.slice(0,50);
-          const result=await this.send({action:'push',operations:batch});
+          const result=await this.request({action:'push',operations:batch});
+          if(result?.reset){await this.acceptHistory(result);await this.pull();continue;}
           if(!Array.isArray(result?.ack))throw Error('Falta confirmación del servidor.');
           const ack=new Set(result.ack);
           this.data.pending=this.data.pending.filter(p=>!ack.has(p.operationId));this.persist();
@@ -69,7 +84,8 @@
     }
     async pull(){
       for(let count=0;this.ready&&count<100;count++){
-        const result=await this.send({action:'list',cursor:this.data.cursor});
+        const result=await this.request({action:'list',cursor:this.data.cursor});
+        if(result?.reset){await this.acceptHistory(result);continue;}
         if(!Array.isArray(result?.events)||!Number.isSafeInteger(result.cursor)||result.cursor<this.data.cursor)throw Error('Cursor remoto inválido.');
         const next=clone(this.data);
         const changes=[];
@@ -92,8 +108,15 @@
         if(!result.events.length)throw Error('Paginación sin progreso.');
       }
     }
+    async clearHistory(ticket){
+      if(!this.ready||this.busy)throw Error('Espera a que termine la sincronización.');
+      const result=await this.request({action:'clearHistory',ticket,confirm:'BORRAR HISTORIAL'});
+      if(result?.cleared!==true)throw Error('Google no confirmó el borrado. Sincroniza antes de intentarlo de nuevo.');
+      await this.acceptHistory(result);await this.sync();return result;
+    }
     stop(){this.ready=false;}
   }
   const api={Engine,entities,pointId,addressId,KEY,BACKUP};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.GpsSync=api;
 })(typeof window==='undefined'?globalThis:window);
+

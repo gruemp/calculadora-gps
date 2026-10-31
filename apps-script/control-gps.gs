@@ -22,10 +22,62 @@ function gpsApi(request) {
     }
     if(!sheet)throw Error('GPS_SCHEMA_MISSING');
     if(JSON.stringify(sheet.getRange(1,1,1,headers.length).getValues()[0])!==JSON.stringify(headers))throw Error('GPS_SCHEMA_MISMATCH');
+    function readRows(){var n=Math.max(0,sheet.getLastRow()-1);return n?sheet.getRange(2,1,n,headers.length).getValues():[];}
+    // A confirmed clear can resume after an interrupted request. Delete only record rows,
+    // bottom-up; favorites, addresses, headers and their original sequences are untouched.
+    function finishHistoryClear(pending){
+      var current=readRows();
+      for(var i=current.length-1;i>=0;){
+        if(current[i][3]!=='record'){i--;continue;}
+        var end=i;while(i>=0&&current[i][3]==='record')i--;
+        sheet.deleteRows(i+3,end-i);
+      }
+      SpreadsheetApp.flush();
+      var result={cleared:true,removedRecords:pending.records,removedEvents:pending.recordEvents,
+        historyEpoch:pending.epoch,historyClearedAt:pending.clearedAt};
+      props.setProperty('GPS_HISTORY_LAST_CLEAR',JSON.stringify({ticket:pending.ticket,result:result}));
+      props.deleteProperty('GPS_HISTORY_CLEAR_PENDING');props.deleteProperty('GPS_HISTORY_CLEAR_TICKET');
+      return result;
+    }
+    var unfinished=JSON.parse(props.getProperty('GPS_HISTORY_CLEAR_PENDING')||'null');
+    if(unfinished)finishHistoryClear(unfinished);
     var total=Math.max(0,sheet.getLastRow()-1);
     // Explicit bound: no unbounded growth silently approaching execution limits.
     if(total>50000)throw Error('GPS_ARCHIVE_REQUIRED');
-    if(action==='status'||action==='initialize')return {service:'control-gps',version:1,dataset:sheetId,actor:actor,events:total};
+    var historyEpoch=props.getProperty('GPS_HISTORY_EPOCH')||'initial';
+    var historyClearedAt=Number(props.getProperty('GPS_HISTORY_CLEARED_AT'))||0;
+    var sequenceFloor=Number(props.getProperty('GPS_EVENT_SEQUENCE'))||0;
+    var lastSequence=Math.max(sequenceFloor,total?Number(sheet.getRange(total+1,1).getValues()[0][0]):0);
+    function withHistory(value){return Object.assign(value,{historyEpoch:historyEpoch,historyClearedAt:historyClearedAt});}
+    if(action==='status'||action==='initialize')return withHistory({service:'control-gps',version:1,dataset:sheetId,actor:actor,events:total,features:{clearHistory:true}});
+    if(action==='prepareHistoryClear'||action==='clearHistory'){
+      if(actor!==owner)throw Error('GPS_FORBIDDEN');
+      if(req.clientVersion!==2)throw Error('GPS_CLIENT_UPDATE_REQUIRED');
+      var previous=JSON.parse(props.getProperty('GPS_HISTORY_LAST_CLEAR')||'null');
+      // An uncertain response is safe to retry, even after new records were captured.
+      if(action==='clearHistory'&&previous&&previous.ticket===req.ticket)return previous.result;
+      if(req.historyEpoch!==historyEpoch)throw Error('GPS_HISTORY_RESET');
+      if(action==='prepareHistoryClear'){
+        var all=readRows(),recordRows=all.filter(function(r){return r[3]==='record';});
+        var ids={};recordRows.forEach(function(r){ids[r[2]]=true;});
+        var plan={ticket:Utilities.getUuid(),actor:actor,epoch:historyEpoch,sequence:lastSequence,
+          total:total,records:Object.keys(ids).length,recordEvents:recordRows.length,expires:Date.now()+300000};
+        props.setProperty('GPS_HISTORY_CLEAR_TICKET',JSON.stringify(plan));
+        return withHistory({ticket:plan.ticket,records:plan.records,recordEvents:plan.recordEvents});
+      }
+      var plan=JSON.parse(props.getProperty('GPS_HISTORY_CLEAR_TICKET')||'null');
+      if(!plan||req.ticket!==plan.ticket||plan.actor!==actor||plan.expires<Date.now()||req.confirm!=='BORRAR HISTORIAL')throw Error('GPS_CLEAR_CONFIRMATION_REQUIRED');
+      if(plan.epoch!==historyEpoch||plan.sequence!==lastSequence||plan.total!==total)throw Error('GPS_CLEAR_CHANGED');
+      var pending={ticket:plan.ticket,records:plan.records,recordEvents:plan.recordEvents,epoch:Utilities.getUuid(),clearedAt:Date.now()};
+      // Invalidate stale clients BEFORE deleting rows. New captures after this time survive.
+      props.setProperties({GPS_HISTORY_EPOCH:pending.epoch,GPS_HISTORY_CLEARED_AT:String(pending.clearedAt),
+        GPS_EVENT_SEQUENCE:String(lastSequence),GPS_HISTORY_CLEAR_PENDING:JSON.stringify(pending)});
+      return finishHistoryClear(pending);
+    }
+    if(action==='list'||action==='push'){
+      if(historyEpoch!=='initial'&&req.clientVersion!==2)throw Error('GPS_CLIENT_UPDATE_REQUIRED');
+      if(req.clientVersion===2&&req.historyEpoch!==historyEpoch)return withHistory({reset:true});
+    }
     function clean(entity) {
       if(!entity||typeof entity!=='object'||Array.isArray(entity))throw Error('GPS_INVALID_ENTITY');
       var id=entity.entityId,kind=entity.kind,v=entity.value;
@@ -48,17 +100,19 @@ function gpsApi(request) {
     function event(row){return {seq:Number(row[0]),operationId:String(row[1]),entityId:String(row[2]),kind:String(row[3]),base:Number(row[4]),serverTime:String(row[5]),device:String(row[7]),value:JSON.parse(row[8]),conflict:row[9]===true};}
     if(action==='list'){
       var cursor=req.cursor;
-      if(!Number.isSafeInteger(cursor)||cursor<0||cursor>total)throw Error('GPS_INVALID_CURSOR');
-      var amount=Math.min(200,total-cursor);
-      var events=amount?sheet.getRange(cursor+2,1,amount,headers.length).getValues().map(event):[];
-      return {events:events,cursor:cursor+amount,more:cursor+amount<total};
+      if(!Number.isSafeInteger(cursor)||cursor<0||cursor>lastSequence)throw Error('GPS_INVALID_CURSOR');
+      var remaining=readRows().filter(function(r){return Number(r[0])>cursor;});
+      var events=remaining.slice(0,200).map(event),more=remaining.length>200;
+      return withHistory({events:events,cursor:more?events[events.length-1].seq:lastSequence,more:more});
     }
     if(action==='push'){
       if(!Array.isArray(req.operations)||req.operations.length>50||!req.operations.length)throw Error('GPS_INVALID_BATCH');
       // Validate the entire batch before any write. Serialized JSON cannot become a Sheet formula.
       var ops=req.operations.map(function(op){
         if(!op||!/^[A-Za-z0-9_-]{10,100}$/.test(op.operationId)||!/^[A-Za-z0-9_-]{10,100}$/.test(op.device)||!Number.isSafeInteger(op.base)||op.base<0)throw Error('GPS_INVALID_OPERATION');
-        return Object.assign(clean(op),{operationId:op.operationId,device:op.device,base:op.base});
+        var cleaned=clean(op);
+        if(cleaned.kind==='record'&&cleaned.value.timestamp<=historyClearedAt)throw Error('GPS_RECORD_BEFORE_CLEAR');
+        return Object.assign(cleaned,{operationId:op.operationId,device:op.device,base:op.base});
       });
       var rows=total?sheet.getRange(2,1,total,headers.length).getValues():[];
       var ids={},versions={};
@@ -70,13 +124,17 @@ function gpsApi(request) {
           if(old[2]!==op.entityId||old[3]!==op.kind||old[8]!==JSON.stringify(op.value)||Number(old[4])!==op.base||old[7]!==op.device)throw Error('GPS_OPERATION_REUSED');
           ack.push(op.operationId);return;
         }
-        var seq=total+fresh.length+1;
+        var seq=lastSequence+fresh.length+1;
         var row=[seq,op.operationId,op.entityId,op.kind,op.base,new Date().toISOString(),actor,op.device,JSON.stringify(op.value),op.base!==(versions[op.entityId]||0)];
         fresh.push(row);ids[op.operationId]=row;versions[op.entityId]=seq;ack.push(op.operationId);
       });
       if(total+fresh.length>50000)throw Error('GPS_ARCHIVE_REQUIRED');
-      if(fresh.length){sheet.getRange(total+2,1,fresh.length,headers.length).setValues(fresh);SpreadsheetApp.flush();}
-      return {ack:ack};
+      if(fresh.length){
+        var needed=total+fresh.length+1,capacity=sheet.getMaxRows();
+        if(needed>capacity)sheet.insertRowsAfter(capacity,needed-capacity);
+        sheet.getRange(total+2,1,fresh.length,headers.length).setValues(fresh);SpreadsheetApp.flush();
+      }
+      return withHistory({ack:ack});
     }
     if(action==='geocode'){
       if(props.getProperty('GPS_GEOCODE_ENABLED')!=='true')throw Error('GPS_GEOCODE_DISABLED');
@@ -104,3 +162,4 @@ function gpsApi(request) {
 }
 /** Run once in the editor after configuring private Script Properties. */
 function gpsInitialize(){return gpsApi({action:'initialize'});}
+

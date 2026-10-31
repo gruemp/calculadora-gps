@@ -6,27 +6,27 @@ const {Engine,entities,KEY}=require('../gps-sync.js');
 const script=fs.readFileSync(require('node:path').join(__dirname,'../apps-script/control-gps.gs'),'utf8');
 function server(){
   const data=[];const properties={GPS_OWNER_EMAIL:'owner@example.test',GPS_SPREADSHEET_ID:'private-sheet',GPS_GEOCODE_ENABLED:'true',GPS_GEOCODE_DAILY_LIMIT:'2'};
-  let actor='owner@example.test',geoCalls=0;
+  let actor='owner@example.test',geoCalls=0,failDelete=false;
   const range=(row,col,n=1,m=1)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:m},(_,j)=>data[row+i-1]?.[col+j-1]??'')),setValues:values=>values.forEach((r,i)=>{data[row+i-1]=r;})});
-  const sheet={getRange:range,getLastRow:()=>data.length,setFrozenRows:()=>{}};
+  const sheet={getRange:range,getLastRow:()=>data.length,setFrozenRows:()=>{},getMaxRows:()=>1000,insertRowsAfter:()=>{},deleteRows:(start,count)=>{if(failDelete){failDelete=false;throw Error('temporary sheet failure');}data.splice(start-1,count);}};
   let exists=false;
   const book={getSheetByName:()=>exists?sheet:null,insertSheet:()=>{exists=true;return sheet;}};
-  const ctx=vm.createContext({PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties[k],setProperty:(k,v)=>{properties[k]=v;}})},Session:{getEffectiveUser:()=>({getEmail:()=>actor})},SpreadsheetApp:{openById:()=>book,flush:()=>{}},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},Maps:{newGeocoder:()=>({setLanguage(){return this;},reverseGeocode(){geoCalls++;return {status:'OK',results:[{formatted_address:'Dirección de prueba',geometry:{location_type:'APPROXIMATE'},address_components:[{long_name:'Colombia',types:['country']}]}]};}})}});
+  const ctx=vm.createContext({Utilities:{getUuid:()=>require('node:crypto').randomUUID()},PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties[k],setProperty:(k,v)=>{properties[k]=v;},setProperties:values=>Object.assign(properties,values),deleteProperty:k=>{delete properties[k];}})},Session:{getEffectiveUser:()=>({getEmail:()=>actor})},SpreadsheetApp:{openById:()=>book,flush:()=>{}},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},Maps:{newGeocoder:()=>({setLanguage(){return this;},reverseGeocode(){geoCalls++;return {status:'OK',results:[{formatted_address:'Dirección de prueba',geometry:{location_type:'APPROXIMATE'},address_components:[{long_name:'Colombia',types:['country']}]}]};}})}});
   vm.runInContext(script,ctx);
   const call=request=>JSON.parse(JSON.stringify(ctx.gpsApi(JSON.parse(JSON.stringify(request)))));
   call({action:'initialize'});
-  return {call,data,properties,actor:a=>{actor=a;},geoCalls:()=>geoCalls};
+  return {call,data,properties,actor:a=>{actor=a;},geoCalls:()=>geoCalls,failNextDelete:()=>{failDelete=true;}};
 }
 function memory(){const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};}
 const point={latitude:4.6,longitude:-74.1,accuracy:8,timestamp:1700000000000};
 const snapshot=(address='')=>entities([point],[{...point,label:'Casa'}],address?{'4.600000,-74.100000':{address,source:'manual'}}:{});
-function client(s,{storage=memory(),send,apply}={}){
+function client(s,{storage=memory(),send,apply,resetHistory}={}){
   let n=0;const applied=[];
-  const e=new Engine({storage,send:send||(async(r)=>s.call(r)),apply:apply||(async(events)=>applied.push(...events)),uuid:()=>require('node:crypto').randomUUID()});
+  const e=new Engine({storage,resetHistory,send:send||(async(r)=>s.call(r)),apply:apply||(async(events)=>applied.push(...events)),uuid:()=>require('node:crypto').randomUUID()});
   return {e,applied,storage};
 }
 test('anonymous and unauthorized accounts cannot read, write, geocode or initialize',()=>{
-  const s=server();for(const actor of ['','intruder@example.test']){s.actor(actor);for(const action of ['status','list','push','geocode','initialize'])assert.throws(()=>s.call({action}),/GPS_FORBIDDEN/);}
+  const s=server();for(const actor of ['','intruder@example.test']){s.actor(actor);for(const action of ['status','list','push','geocode','initialize','prepareHistoryClear','clearHistory'])assert.throws(()=>s.call({action}),/GPS_FORBIDDEN/);}
 });
 test('unconfigured backend fails closed',()=>{const s=server();delete s.properties.GPS_SPREADSHEET_ID;assert.throws(()=>s.call({action:'status'}),/GPS_NOT_CONFIGURED/);});
 test('write, read, two-device recovery, favorites and manual addresses',async()=>{
@@ -148,19 +148,19 @@ test('published app preserves current CSS and local key; all scripts parse',()=>
   for(const match of after.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
   for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
 });
-function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false}={}){
+function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false,confirmValue=true,promptValue='BORRAR HISTORIAL'}={}){
   const storage=memory();storage.setItem('gpsGoogleConfigV1',JSON.stringify(withoutSavedIds?{consent}:{clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',consent}));storage.setItem('gpsTrackerState',JSON.stringify({days:{original:'preserved'},geoapifyKey:'local-only-secret'}));
   const elements=new Map(),requests=[],timers=new Map();let timer=0,revoked=false;
   function element(id){if(!elements.has(id))elements.set(id,{value:'',checked:false,textContent:'',disabled:false,listeners:{},addEventListener(name,cb){this.listeners[name]=cb;}});return elements.get(id);}
   const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:()=>{},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:()=>options.callback({access_token:'memory-token',expires_in:3600})})}}}};
-  const ctx=vm.createContext({window:win,document:{getElementById:element},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>true,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
+  const ctx=vm.createContext({window:win,document:{getElementById:element},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>confirmValue,prompt:()=>promptValue,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
     const request=JSON.parse(options.body);requests.push({url,options,request});
     return {ok:httpStatus===200,status:httpStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
   }});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../gps-google.js'),'utf8'),ctx);
   const current=snapshot('Privada'),diagnostics=[];
-  const api=win.GpsGoogle.init({snapshot:()=>current,apply:events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},save:()=>true,render:()=>{},diagnostic:message=>diagnostics.push(message)});
-  return {api,storage,requests,element,diagnostics,click:id=>element(id).listeners.click(),revoked:()=>revoked};
+  const api=win.GpsGoogle.init({snapshot:()=>current,apply:events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},clearHistoryBefore:cutoff=>{for(const [id,e] of Object.entries(current))if(e.kind==='record'&&e.value.timestamp<=cutoff)delete current[id];},save:()=>true,render:()=>{},diagnostic:message=>diagnostics.push(message)});
+  return {api,current,storage,requests,element,diagnostics,click:id=>element(id).listeners.click(),revoked:()=>revoked};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
 test('new device uses published service configuration without entering identifiers',async()=>{
@@ -198,5 +198,92 @@ test('clearing local projection rewinds recovery without producing remote remova
   const before=s.data.length;assert.equal(a.api.prepareLocalClear(),true);
   const data=JSON.parse(a.storage.getItem(KEY));assert.equal(data.cursor,0);assert.deepEqual(data.observed,{});assert.equal(s.data.length,before);
   const restored=client(s,{storage:a.storage});await restored.e.bind();await restored.e.sync();assert.equal(restored.applied.length,3);assert.equal(s.data.length,before);
+});
+
+async function populatedServer(){
+  const s=server(),a=client(s);await a.e.bind();a.e.observe(snapshot('Dirección conservada'));await a.e.sync();
+  return {s,a};
+}
+const prepareClear=s=>s.call({action:'prepareHistoryClear',clientVersion:2,historyEpoch:s.call({action:'status'}).historyEpoch});
+const confirmClear=(s,plan)=>s.call({action:'clearHistory',clientVersion:2,historyEpoch:plan.historyEpoch,ticket:plan.ticket,confirm:'BORRAR HISTORIAL'});
+test('remote history clear requires owner, explicit confirmation and an unchanged preview',async()=>{
+  const {s}=await populatedServer(),before=JSON.stringify(s.data);
+  s.properties.GPS_ALLOWED_EMAILS='owner@example.test,member@example.test';s.actor('member@example.test');
+  assert.throws(()=>prepareClear(s),/GPS_FORBIDDEN/);s.actor('owner@example.test');
+  const plan=prepareClear(s);assert.equal(plan.records,1);assert.equal(plan.recordEvents,1);assert.equal(JSON.stringify(s.data),before);
+  assert.throws(()=>s.call({action:'clearHistory',clientVersion:2,historyEpoch:plan.historyEpoch,ticket:plan.ticket,confirm:'no'}),/GPS_CLEAR_CONFIRMATION_REQUIRED/);
+  s.call({action:'push',operations:[{operationId:'another_address_operation',device:'test_device_12345',entityId:'address|4.600000,-74.100000',kind:'address',value:{address:'Nueva dirección'},base:3}]});
+  assert.throws(()=>confirmClear(s,plan),/GPS_CLEAR_CHANGED/);assert.equal(s.data.filter(r=>r[3]==='record').length,1);
+});
+test('remote clear physically removes only record versions and keeps exact favorite/address rows and sequences',async()=>{
+  const {s}=await populatedServer(),header=s.data[0].slice(),retained=s.data.slice(1).filter(r=>r[3]!=='record').map(r=>r.slice());
+  const result=confirmClear(s,prepareClear(s));assert.equal(result.removedRecords,1);assert.equal(result.removedEvents,1);
+  assert.deepEqual(s.data,[header,...retained]);
+  const page=s.call({action:'list',clientVersion:2,historyEpoch:result.historyEpoch,cursor:0});
+  assert.deepEqual(page.events.map(e=>e.seq),[2,3]);assert.equal(page.cursor,3);assert.equal(page.more,false);
+  assert.equal(page.events.find(e=>e.kind==='favorite').value.enabled,true);
+  assert.equal(page.events.find(e=>e.kind==='address').value.address,'Dirección conservada');
+});
+test('retry after an uncertain clear response never deletes subsequent captures and old clients cannot resurrect history',async()=>{
+  const {s}=await populatedServer(),plan=prepareClear(s),cleared=confirmClear(s,plan);
+  const fresh={...point,timestamp:cleared.historyClearedAt+1},op={operationId:'fresh_after_clear_12345',device:'test_device_12345',entityId:'record|'+[fresh.timestamp,fresh.latitude,fresh.longitude].join('|'),kind:'record',value:fresh,base:0};
+  s.call({action:'push',clientVersion:2,historyEpoch:cleared.historyEpoch,operations:[op]});
+  const before=JSON.stringify(s.data);assert.deepEqual(confirmClear(s,plan),cleared);assert.equal(JSON.stringify(s.data),before);
+  assert.throws(()=>s.call({action:'push',operations:[op]}),/GPS_CLIENT_UPDATE_REQUIRED/);
+  const stale=s.call({action:'push',clientVersion:2,historyEpoch:'initial',operations:[op]});assert.equal(stale.reset,true);assert.equal(JSON.stringify(s.data),before);
+  assert.throws(()=>s.call({action:'push',clientVersion:2,historyEpoch:cleared.historyEpoch,operations:[{...op,operationId:'old_capture_1234567890',entityId:'record|'+[point.timestamp,point.latitude,point.longitude].join('|'),value:point}]}),/GPS_RECORD_BEFORE_CLEAR/);
+});
+test('interrupted row deletion resumes safely without removing favorites or addresses',async()=>{
+  const {s}=await populatedServer(),plan=prepareClear(s),retained=s.data.slice(1).filter(r=>r[3]!=='record').map(r=>r.slice());
+  s.failNextDelete();assert.throws(()=>confirmClear(s,plan),/temporary sheet failure/);
+  assert.ok(s.properties.GPS_HISTORY_CLEAR_PENDING);const status=s.call({action:'status'});
+  assert.equal(status.events,retained.length);assert.deepEqual(s.data.slice(1),retained);assert.equal(s.properties.GPS_HISTORY_CLEAR_PENDING,undefined);
+  assert.equal(confirmClear(s,plan).cleared,true);
+});
+test('an offline client drops erased historical captures while preserving newer captures and favorite edits',async()=>{
+  const {s}=await populatedServer(),current={},applied=[];
+  const b=client(s,{apply:async events=>{applied.push(...events);for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},resetHistory:async cutoff=>{for(const [id,e] of Object.entries(current))if(e.kind==='record'&&e.value.timestamp<=cutoff)delete current[id];}});
+  await b.e.bind();await b.e.sync();
+  const cleared=confirmClear(s,prepareClear(s)),fresh={...point,timestamp:cleared.historyClearedAt+1000};
+  const next=entities([point,fresh],[{...point,label:'Favorito editado sin conexión'}],{'4.600000,-74.100000':current['address|4.600000,-74.100000'].value});
+  Object.assign(current,next);b.e.observe(next);await b.e.sync();
+  const records=s.data.filter(r=>r[3]==='record');assert.equal(records.length,1);assert.equal(JSON.parse(records[0][8]).timestamp,fresh.timestamp);
+  assert.ok(!current['record|'+[point.timestamp,point.latitude,point.longitude].join('|')]);
+  assert.equal(b.e.data.pending.length,0);assert.equal(b.e.data.historyEpoch,cleared.historyEpoch);
+  const favorites=s.data.filter(r=>r[3]==='favorite');assert.equal(JSON.parse(favorites.at(-1)[8]).label,'Favorito editado sin conexión');
+});
+test('remote-clear UI cancels without deleting and confirms only after the exact phrase',async()=>{
+  for(const options of [{confirmValue:false},{promptValue:'no borrar'}]){
+    const s=server(),a=adapter(s,{consent:true,...options});a.click('googleConnectBtn');await settle();const before=JSON.stringify(s.data);
+    a.click('googleClearHistoryBtn');await settle();assert.equal(JSON.stringify(s.data),before);assert.match(a.element('googleSyncStatus').textContent,/cancelado/);
+  }
+  const s=server(),a=adapter(s,{consent:true});a.click('googleConnectBtn');await settle();
+  const kept=s.data.filter(r=>r[3]==='favorite'||r[3]==='address').map(r=>r.slice());
+  a.click('googleClearHistoryBtn');await settle();assert.deepEqual(s.data.slice(1),kept);assert.match(a.element('googleSyncStatus').textContent,/Historial borrado/);
+  assert.equal(Object.values(a.current).filter(e=>e.kind==='record').length,0);assert.equal(Object.values(a.current).filter(e=>e.kind==='favorite').length,1);
+  const recoveryKey=a.storage.getItem('gpsHistoryLastBackupV1');assert.ok(recoveryKey);
+  assert.equal(JSON.parse(a.storage.getItem(recoveryKey)).days.original,'preserved');
+  assert.equal(JSON.parse(a.storage.getItem('gpsSyncBackupV1')).days.original,'preserved');
+});
+test('clearing an all-record journal preserves headers and monotonic sequence for subsequent captures',async()=>{
+  const s=server(),a=client(s);await a.e.bind();a.e.observe(entities([point,{...point,timestamp:point.timestamp+1}],[],{}));await a.e.sync();
+  const header=s.data[0].slice(),plan=prepareClear(s);assert.equal(plan.records,2);
+  const cleared=confirmClear(s,plan);assert.deepEqual(s.data,[header]);
+  const empty=s.call({action:'list',clientVersion:2,historyEpoch:cleared.historyEpoch,cursor:0});assert.equal(empty.cursor,2);assert.deepEqual(empty.events,[]);
+  const p={...point,timestamp:cleared.historyClearedAt+10};
+  s.call({action:'push',clientVersion:2,historyEpoch:cleared.historyEpoch,operations:[{operationId:'after_empty_clear_1234',device:'device_123456',kind:'record',entityId:'record|'+[p.timestamp,p.latitude,p.longitude].join('|'),value:p,base:0}]});
+  assert.equal(s.data[1][0],3);assert.deepEqual(s.data[0],header);
+});
+test('expired clear tickets cannot delete data',async()=>{
+  const {s}=await populatedServer(),plan=prepareClear(s),before=JSON.stringify(s.data);
+  const stored=JSON.parse(s.properties.GPS_HISTORY_CLEAR_TICKET);stored.expires=Date.now()-1;s.properties.GPS_HISTORY_CLEAR_TICKET=JSON.stringify(stored);
+  assert.throws(()=>confirmClear(s,plan),/GPS_CLEAR_CONFIRMATION_REQUIRED/);assert.equal(JSON.stringify(s.data),before);
+});
+test('a newly linked profile cannot migrate historical records erased before its first connection',async()=>{
+  const {s}=await populatedServer(),cleared=confirmClear(s,prepareClear(s));let clearedLocally=false;
+  const b=client(s,{resetHistory:async cutoff=>{clearedLocally=cutoff===cleared.historyClearedAt;}});
+  await b.e.bind();b.e.observe(snapshot('Dirección conservada'));await b.e.sync();
+  assert.equal(clearedLocally,true);assert.equal(s.data.filter(r=>r[3]==='record').length,0);
+  assert.ok(s.data.some(r=>r[3]==='favorite'));assert.ok(s.data.some(r=>r[3]==='address'));
 });
 
