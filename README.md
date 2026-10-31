@@ -57,7 +57,17 @@ La configuración pública de instalación ya está completa en `gps-google-serv
 
 El historial local y las copias de seguridad se conservan. El API sigue restringido a «Solo yo»; no se publican tokens, contraseñas, secretos ni IDs de hojas privadas. Se mantienen el diseño y las funciones GPS. La prueba física en el Android del propietario y dos dispositivos simultáneos no se realizaron desde esta sesión.
 
-La suite local se ejecuta con `node --test tests/sync.test.cjs` y pasa **25/25**; sus servicios Google son simulados. Las pruebas reales y limitaciones están registradas por separado en [apps-script/README.md](apps-script/README.md). [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el estado vigente y los antecedentes.
+La suite local se ejecuta con `node --test tests/sync.test.cjs` y pasa **35/35**; sus servicios Google son simulados. Las pruebas reales y limitaciones están registradas por separado en [apps-script/README.md](apps-script/README.md). [INTEGRACION_APPS_SCRIPT_PENDIENTE.md](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) conserva el estado vigente y los antecedentes.
+
+## Borrar el historial de Google Sheets
+
+En **Opciones y datos → Google Sheets privado**, conecta la cuenta propietaria y pulsa **Borrar historial de Google Sheets**. Primero se muestra el número de registros y versiones; para ejecutar la operación debes aceptar y escribir exactamente **BORRAR HISTORIAL**.
+
+Este botón elimina físicamente de la pestaña los registros GPS y todas sus versiones. **Conserva los favoritos, las direcciones, los encabezados, la configuración y las copias de seguridad.** También retira el historial anterior del navegador actual; los otros dispositivos lo reflejan al reconectar. Los registros nuevos pendientes posteriores al borrado se conservan, y los ya sincronizados no reaparecen por un reloj adelantado. Los clientes antiguos deben recargar antes de sincronizar tras un borrado.
+
+Se guarda una copia local accesible mediante **Descargar copia anterior al borrado**, sin sustituir la copia previa a la sincronización. El historial de versiones propio de Google Sheets y los JSON ya descargados no se eliminan con este botón.
+
+La implementación API existente se actualizó a la **versión 2**, conservando su ID, permisos y acceso «Solo yo». La vista previa y su cancelación se comprobaron realmente desde Pages; los 28 eventos presentes antes de la prueba permanecieron intactos. El borrado destructivo, la conservación exacta de favoritos/direcciones, los reintentos y la recuperación de una interrupción se probaron con datos simulados, dentro de las 35 pruebas aprobadas. No se ejecutó un borrado real del historial del propietario durante el desarrollo.
 
 ## Desplazamiento libre
 

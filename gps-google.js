@@ -82,9 +82,9 @@
         });
         if(!acquired)throw Error('Ya hay otra pestaña sincronizando. Desconéctala primero.');
         if(session!==epoch){if(tabRelease){tabRelease();tabRelease=null;}return;}
-        engine=new root.GpsSync.Engine({storage:localStorage,send,status,resetHistory:async(cutoff,generation)=>{
+        engine=new root.GpsSync.Engine({storage:localStorage,send,status,resetHistory:async(cutoff,generation,erasedIds=[])=>{
           const current=snapshot();
-          if(!Object.values(current).some(e=>e.kind==='record'&&e.value.timestamp<=cutoff))return;
+          if(!Object.entries(current).some(([id,e])=>e.kind==='record'&&(e.value.timestamp<=cutoff||erasedIds.includes(id))))return;
           if(typeof clearHistoryBefore!=='function')throw Object.assign(Error('Recarga la aplicación para reflejar el borrado del historial.'),{permanent:true});
           const backupKey='gpsHistoryBeforeClearV1:'+generation;
           try{
@@ -92,7 +92,7 @@
             localStorage.setItem('gpsHistoryLastBackupV1',backupKey);$('googleHistoryBackupBtn').disabled=false;
           }catch{throw Object.assign(Error('No se pudo guardar una copia local antes de reflejar el borrado. Exporta tus datos y vuelve a conectar.'),{permanent:true});}
           applying=true;
-          try{clearHistoryBefore(cutoff);if(save()===false)throw Error('No se pudo guardar el historial actualizado.');render();}
+          try{clearHistoryBefore(cutoff,erasedIds);if(save()===false)throw Error('No se pudo guardar el historial actualizado.');render();}
           finally{applying=false;}
         },apply:async events=>{
           applying=true;try{apply(events);if(save()===false)throw Error('No se pudo conservar la lectura en el almacenamiento local.');render();}finally{applying=false;}

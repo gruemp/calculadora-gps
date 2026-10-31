@@ -3,7 +3,7 @@
  * Los usuarios no introducen ningún código.
  * Mantener OAuth con consentimiento y el API ejecutable con acceso restringido.
  * No añadir IDs de hojas, claves privadas, contraseñas ni tokens.
- * API ejecutable existente verificado el 2026-10-31, versión 1, acceso Solo yo.
+ * API ejecutable existente verificado el 2026-10-31, actualizado a versión 2, acceso Solo yo.
  * Cliente OAuth web existente facilitado por el propietario el 2026-10-31.
  * La configuración pública permite conectar desde dispositivos nuevos.
  * Los tokens siguen siendo temporales y requieren autorización de Google.

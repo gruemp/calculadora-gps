@@ -286,4 +286,11 @@ test('a newly linked profile cannot migrate historical records erased before its
   assert.equal(clearedLocally,true);assert.equal(s.data.filter(r=>r[3]==='record').length,0);
   assert.ok(s.data.some(r=>r[3]==='favorite'));assert.ok(s.data.some(r=>r[3]==='address'));
 });
+test('previously synchronized records with an incorrect future timestamp cannot reappear after a clear',async()=>{
+  const s=server(),future={...point,timestamp:Date.now()+86400000},current={};
+  const a=client(s,{apply:async events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},resetHistory:async(cutoff,epoch,erasedIds)=>{for(const [id,e] of Object.entries(current))if(e.kind==='record'&&(e.value.timestamp<=cutoff||erasedIds.includes(id)))delete current[id];}});
+  await a.e.bind();a.e.observe(entities([future],[],{}));await a.e.sync();assert.equal(s.data.length,2);
+  confirmClear(s,prepareClear(s));await a.e.sync();a.e.observe(current);await a.e.sync();
+  assert.equal(s.data.length,1);assert.equal(Object.keys(current).length,0);assert.equal(a.e.data.pending.length,0);
+});
 

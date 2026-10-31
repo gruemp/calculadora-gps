@@ -388,9 +388,9 @@
     </section>
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
-  <script src="gps-sync.js?v=20261031-history-clear"></script>
+  <script src="gps-sync.js?v=20261031-history-clear-2"></script>
   <script src="gps-google-service.js"></script>
-  <script src="gps-google.js?v=20261031-history-clear"></script>
+  <script src="gps-google.js?v=20261031-history-clear-2"></script>
   <script>
     (function () {
       'use strict';
@@ -922,9 +922,9 @@
                 if(p.address)state.addresses[k]={...p};else delete state.addresses[k];
               }
             }
-          },clearHistoryBefore:cutoff=>{
+          },clearHistoryBefore:(cutoff,erasedIds=[])=>{
             for(const day of Object.values(state.days))for(const bucket of Object.values(day.hours||{})){
-              if(Array.isArray(bucket.locations))bucket.locations=bucket.locations.filter(p=>Number(p.timestamp)>cutoff);
+              if(Array.isArray(bucket.locations))bucket.locations=bucket.locations.filter(p=>Number(p.timestamp)>cutoff&&!erasedIds.includes('record|'+window.GpsSync.pointId(p)));
             }
             const remaining=allLocations();
             state.lastLocation=remaining.length?remaining[remaining.length-1]:null;

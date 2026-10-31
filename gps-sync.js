@@ -30,10 +30,13 @@
       const epoch=info.historyEpoch||'initial',cutoff=Number(info.historyClearedAt)||0;
       if(typeof epoch!=='string'||!Number.isSafeInteger(cutoff)||cutoff<0)throw Error('Estado de borrado remoto inválido.');
       const changed=this.data.historyEpoch?this.data.historyEpoch!==epoch:epoch!=='initial';
-      // Keep captures made after the clear. Old offline history must not resurrect.
-      if(cutoff)await this.resetHistory(cutoff,epoch);
-      this.data.pending=this.data.pending.filter(p=>p.kind!=='record'||p.value.timestamp>cutoff);
-      this.data.observed=Object.fromEntries(Object.entries(this.data.observed).filter(([,e])=>e.kind!=='record'||e.value.timestamp>cutoff));
+      // Known remote records were erased regardless of an incorrect device clock.
+      // Unsent captures made after the cutoff can survive on an offline device.
+      const erasedIds=changed?Object.keys(this.data.revisions).filter(id=>id.startsWith('record|')):[];
+      const erased=new Set(erasedIds);
+      if(cutoff)await this.resetHistory(cutoff,epoch,erasedIds);
+      this.data.pending=this.data.pending.filter(p=>p.kind!=='record'||p.value.timestamp>cutoff&&!erased.has(p.entityId));
+      this.data.observed=Object.fromEntries(Object.entries(this.data.observed).filter(([id,e])=>e.kind!=='record'||e.value.timestamp>cutoff&&!erased.has(id)));
       if(changed){this.data.cursor=0;this.data.revisions={};this.data.audit=this.data.audit.filter(e=>e.kind!=='record');}
       this.data.historyEpoch=epoch;this.data.historyClearedAt=cutoff;this.persist();
     }
