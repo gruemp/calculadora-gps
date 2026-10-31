@@ -24,14 +24,30 @@
     const chosen=validService(published.clientId,published.deploymentId)?published:
       validService(config.clientId,config.deploymentId)?config:null;
     const service=chosen?{clientId:chosen.clientId.trim(),deploymentId:chosen.deploymentId.trim()}:null;
+    const bridgeUrl=root.GpsSession?.validUrl(published.sessionBridgeUrl)?published.sessionBridgeUrl:null;
+    let bridge=null,useBridge=false,connecting=false;
     let token='',expires=0,engine=null,applying=false,timer,attempts=0,epoch=0,geoAt=0,geoCount=0,geoBusy=false,clearing=false,tabRelease;
     function status(message){$('googleSyncStatus').textContent=message+(engine?.data.audit.length?' Conflictos conservados: '+engine.data.audit.length+'.':'');}
     function persistConfig(){localStorage.setItem(CONFIG,JSON.stringify(config));}
     function stop(message='Sincronización detenida. Datos locales conservados.'){
-      epoch++;token='';expires=0;clearTimeout(timer);engine?.stop();if(tabRelease){tabRelease();tabRelease=null;}status(message);$('googleConnectBtn').disabled=false;$('googleClearHistoryBtn').disabled=true;
+      epoch++;token='';expires=0;useBridge=false;bridge?.close();bridge=null;clearTimeout(timer);engine?.stop();if(tabRelease){tabRelease();tabRelease=null;}status(message);$('googleConnectBtn').disabled=false;$('googleClearHistoryBtn').disabled=true;
     }
-    function retry(delay=1500){clearTimeout(timer);if(token&&engine?.ready)timer=setTimeout(run,delay);}
+    function retry(delay=1500){clearTimeout(timer);if((token||useBridge)&&engine?.ready)timer=setTimeout(run,delay);}
+    async function activateBridge(session){
+      if(!bridgeUrl)throw Error('La recuperación automática de sesión aún no está activada.');
+      if(!bridge)bridge=new root.GpsSession.Bridge(bridgeUrl);
+      await bridge.connect();
+      if(session!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
+      useBridge=true;token='';expires=0;
+    }
     async function send(request){
+      const started=epoch;
+      if(!useBridge&&(!token||Date.now()>=expires)&&bridgeUrl)await activateBridge(started);
+      if(useBridge){
+        const result=await bridge.call(request);
+        if(started!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
+        return result;
+      }
       if(!token||Date.now()>=expires)throw Object.assign(Error('Sesión vencida. Pulsa Conectar con Google.'),{permanent:true});
       const session=epoch,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),45000);
       let res;
@@ -56,7 +72,7 @@
     }
     async function run(){
       clearTimeout(timer);if(!engine?.ready||clearing)return;
-      try{await engine.sync();attempts=0;retry(engine.data.pending.length?1500:60000);}
+      try{await engine.sync();attempts=0;retry(engine.data.pending.some(p=>p.kind!=='name'||engine.features.names)?1500:60000);}
       catch(error){
         if(error.permanent){stop(error.message);return;}
         attempts++;status('Sin conexión confirmada. Cambios pendientes conservados; reintento automático.');
@@ -67,11 +83,11 @@
       if(applying||!engine?.ready)return;
       try{engine.observe(snapshot());retry();}catch{stop('No se pudo guardar la cola local. Exporta una copia antes de volver a conectar.');}
     }
-    async function connect(response,session){
+    async function connect(response,session,native=false){
       if(session!==epoch)return;
-      if(response.error||!response.access_token){status('No se autorizó la conexión con Google.');return;}
-      if(!root.google.accounts.oauth2.hasGrantedAllScopes(response,...scopes)){status('Faltan permisos. La sincronización sigue desactivada.');return;}
-      token=response.access_token;expires=Date.now()+Math.max(0,Number(response.expires_in)-60)*1000;
+      if(!native&&(response.error||!response.access_token)){status('No se autorizó la conexión con Google.');return;}
+      if(!native&&!root.google.accounts.oauth2.hasGrantedAllScopes(response,...scopes)){status('Faltan permisos. La sincronización sigue desactivada.');return;}
+      if(!native){token=response.access_token;expires=Date.now()+Math.max(0,Number(response.expires_in)-60)*1000;}
       try{
         if(!navigator.locks)throw Error('Este navegador no permite proteger la sincronización entre pestañas. Usa una versión actual.');
         const acquired=await new Promise((resolve,reject)=>{
@@ -97,7 +113,8 @@
         },apply:async events=>{
           applying=true;try{apply(events);if(save()===false)throw Error('No se pudo conservar la lectura en el almacenamiento local.');render();}finally{applying=false;}
         }});
-        await engine.bind();
+        const health=await engine.bind();
+        config={...config,clientId:service.clientId,deploymentId:service.deploymentId,loginHint:health.actor,consent:true};
         if(session!==epoch){engine.stop();return;}
         if(!localStorage.getItem(root.GpsSync.BACKUP))localStorage.setItem(root.GpsSync.BACKUP,localStorage.getItem('gpsTrackerState')||'{}');
         // Every state transfer starts with a persisted backup and durable queue.
@@ -106,11 +123,21 @@
         status('Cuenta autorizada. Sincronizando…');await run();
       }catch(error){stop('No conectado: '+error.message);}
     }
+    async function resume(){
+      if(!service||!config.consent||!bridgeUrl||connecting||engine?.ready)return;
+      if(config.deploymentId&&config.deploymentId!==service.deploymentId){status('La conexión guardada corresponde a otro servicio. Datos locales conservados.');return;}
+      connecting=true;$('googleConnectBtn').disabled=true;const session=++epoch;
+      status('Recuperando tu sesión privada de Google…');
+      try{await activateBridge(session);await connect({},session,true);}
+      catch(error){if(session===epoch)stop(error.message+' Pulsa Conectar con Google si necesitas autorizar.');}
+      finally{connecting=false;if(session===epoch)$('googleConnectBtn').disabled=!!engine?.ready;}
+    }
     $('googleConsent').checked=config.consent===true;$('googleAutoAddress').checked=config.autoAddress===true;
     $('googleConsent').addEventListener('change',()=>{
       config.consent=$('googleConsent').checked;persistConfig();
       if(!config.consent)stop();
       else if(!service)status('El propietario aún no ha activado el servicio de Google. Tus ubicaciones siguen guardadas localmente.');
+      else if(bridgeUrl)resume();
       else loadGis().then(()=>status('Acceso a Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
     });
     $('googleAutoAddress').addEventListener('change',()=>{config.autoAddress=$('googleAutoAddress').checked;persistConfig();});
@@ -125,13 +152,15 @@
       }
       config={...config,clientId,deploymentId,consent:true};
       if(!root.google?.accounts?.oauth2){loadGis().then(()=>status('Google preparado. Pulsa Conectar con Google de nuevo.')).catch(e=>status(e.message));return;}
+      if(engine?.ready||connecting)return;
+      bridge?.close();bridge=null;useBridge=false;
       const session=++epoch;
-      const client=root.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:scopes.join(' '),include_granted_scopes:false,
+      const client=root.google.accounts.oauth2.initTokenClient({client_id:clientId,scope:scopes.join(' '),include_granted_scopes:false,...(config.loginHint?{login_hint:config.loginHint}:{}),
         callback:r=>connect(r,session),error_callback:()=>status('Se cerró o bloqueó la ventana de Google. La app sigue en modo local.')});
-      client.requestAccessToken({prompt:'select_account'});
+      client.requestAccessToken({prompt:''});
     });
     $('googleDisconnectBtn').addEventListener('click',()=>{
-      const previous=token;config.consent=false;config.autoAddress=false;persistConfig();$('googleConsent').checked=false;$('googleAutoAddress').checked=false;stop();
+      const previous=token;delete config.loginHint;config.consent=false;config.autoAddress=false;persistConfig();$('googleConsent').checked=false;$('googleAutoAddress').checked=false;stop();
       if(previous&&root.google?.accounts?.oauth2)root.google.accounts.oauth2.revoke(previous,()=>{});
     });
     $('googleSyncBtn').addEventListener('click',()=>{if(engine?.ready)run();else status('Configura el servicio y conecta con Google primero.');});
@@ -169,11 +198,14 @@
     $('googleBackupBtn').addEventListener('click',()=>downloadBackup(localStorage.getItem(root.GpsSync.BACKUP),'control-gps-antes-de-sincronizar.json'));
     $('googleHistoryBackupBtn').disabled=!localStorage.getItem('gpsHistoryLastBackupV1');
     $('googleHistoryBackupBtn').addEventListener('click',()=>downloadBackup(localStorage.getItem(localStorage.getItem('gpsHistoryLastBackupV1')),'control-gps-antes-de-borrar-historial.json'));
-    window.addEventListener('online',()=>retry(1000));
-    window.addEventListener('storage',event=>{if(event.key==='gpsTrackerState'&&token)stop('Otra pestaña modificó los datos locales. Recarga esta página antes de reconectar.');});
+    function returned(){if(engine?.ready)run();else resume();}
+    window.addEventListener('online',returned);
+    window.addEventListener('pageshow',returned);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)returned();});
+    window.addEventListener('storage',event=>{if(event.key==='gpsTrackerState'&&(token||useBridge))stop('Otra pestaña modificó los datos locales. Recarga esta página antes de reconectar.');});
     async function lookup(p,automatic=false){
       const report=message=>{status(message);if(!automatic)diagnostic(message);};
-      if(!engine?.ready||!token){if(!automatic)status('Conecta con Google para consultar la dirección.');return false;}
+      if(!engine?.ready||(!token&&!useBridge)){if(!automatic)status('Conecta con Google para consultar la dirección.');return false;}
       if(geoBusy){if(!automatic)report('Ya hay una consulta de dirección en curso. Espera su resultado.');return false;}
       if(automatic&&(Date.now()-geoAt<60000||geoCount>=20))return false;
       if(!automatic&&!confirm('¿Enviar estas coordenadas a Google para consultar una dirección aproximada?')){report('Consulta de dirección cancelada.');return true;}
@@ -195,7 +227,8 @@
     status(service
       ? 'Sincronización desactivada. Autoriza el envío y pulsa Conectar con Google.'
       : 'Sincronización local disponible. El propietario aún no ha activado el servicio privado de Google.');
-    if(service&&config.consent)loadGis().then(()=>status('Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
+    if(service&&config.consent&&bridgeUrl)resume();
+    else if(service&&config.consent)loadGis().then(()=>status('Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
     function prepareLocalClear(){
       stop('Sincronización pausada al borrar información local. Reconectar recupera los registros remotos.');
       try{

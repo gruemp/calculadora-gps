@@ -6,16 +6,16 @@ const {Engine,entities,KEY}=require('../gps-sync.js');
 const script=fs.readFileSync(require('node:path').join(__dirname,'../apps-script/control-gps.gs'),'utf8');
 function server(){
   const data=[];const properties={GPS_OWNER_EMAIL:'owner@example.test',GPS_SPREADSHEET_ID:'private-sheet',GPS_GEOCODE_ENABLED:'true',GPS_GEOCODE_DAILY_LIMIT:'2'};
-  let actor='owner@example.test',geoCalls=0,failDelete=false;
+  let actor='owner@example.test',active=null,geoCalls=0,failDelete=false;
   const range=(row,col,n=1,m=1)=>({getValues:()=>Array.from({length:n},(_,i)=>Array.from({length:m},(_,j)=>data[row+i-1]?.[col+j-1]??'')),setValues:values=>values.forEach((r,i)=>{data[row+i-1]=r;})});
   const sheet={getRange:range,getLastRow:()=>data.length,setFrozenRows:()=>{},getMaxRows:()=>1000,insertRowsAfter:()=>{},deleteRows:(start,count)=>{if(failDelete){failDelete=false;throw Error('temporary sheet failure');}data.splice(start-1,count);}};
   let exists=false;
   const book={getSheetByName:()=>exists?sheet:null,insertSheet:()=>{exists=true;return sheet;}};
-  const ctx=vm.createContext({Utilities:{getUuid:()=>require('node:crypto').randomUUID()},PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties[k],setProperty:(k,v)=>{properties[k]=v;},setProperties:values=>Object.assign(properties,values),deleteProperty:k=>{delete properties[k];}})},Session:{getEffectiveUser:()=>({getEmail:()=>actor})},SpreadsheetApp:{openById:()=>book,flush:()=>{}},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},Maps:{newGeocoder:()=>({setLanguage(){return this;},reverseGeocode(){geoCalls++;return {status:'OK',results:[{formatted_address:'Dirección de prueba',geometry:{location_type:'APPROXIMATE'},address_components:[{long_name:'Colombia',types:['country']}]}]};}})}});
+  const ctx=vm.createContext({Utilities:{getUuid:()=>require('node:crypto').randomUUID()},PropertiesService:{getScriptProperties:()=>({getProperty:k=>properties[k],setProperty:(k,v)=>{properties[k]=v;},setProperties:values=>Object.assign(properties,values),deleteProperty:k=>{delete properties[k];}})},Session:{getEffectiveUser:()=>({getEmail:()=>actor}),getActiveUser:()=>({getEmail:()=>active===null?actor:active})},HtmlService:{XFrameOptionsMode:{ALLOWALL:'ALLOWALL'},createHtmlOutput:html=>({html,setTitle(){return this;},setXFrameOptionsMode(){return this;}})},SpreadsheetApp:{openById:()=>book,flush:()=>{}},LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock:()=>{}})},Maps:{newGeocoder:()=>({setLanguage(){return this;},reverseGeocode(){geoCalls++;return {status:'OK',results:[{formatted_address:'Dirección de prueba',geometry:{location_type:'APPROXIMATE'},address_components:[{long_name:'Colombia',types:['country']}]}]};}})}});
   vm.runInContext(script,ctx);
   const call=request=>JSON.parse(JSON.stringify(ctx.gpsApi(JSON.parse(JSON.stringify(request)))));
   call({action:'initialize'});
-  return {call,data,properties,actor:a=>{actor=a;},geoCalls:()=>geoCalls,failNextDelete:()=>{failDelete=true;}};
+  return {call,data,properties,bridgePage:nonce=>ctx.doGet({parameter:{gps_nonce:nonce}}).html,callBridge:req=>ctx.gpsBridgeApi(req),active:a=>{active=a;},actor:a=>{actor=a;},geoCalls:()=>geoCalls,failNextDelete:()=>{failDelete=true;}};
 }
 function memory(){const data=new Map();return {getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};}
 const point={latitude:4.6,longitude:-74.1,accuracy:8,timestamp:1700000000000};
@@ -146,21 +146,22 @@ test('published app preserves current CSS and local key; all scripts parse',()=>
   assert.equal(require('node:crypto').createHash('sha256').update(css).digest('hex'),'2714848bed0734c8c9a4bb1ae6764098afb004007ba52b85f803f401f8d04b6a');
   assert.ok(after.includes("const KEY = 'gpsTrackerState'"));
   for(const match of after.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
-  for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
+  for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js','gps-session.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
 });
-function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false,confirmValue=true,promptValue='BORRAR HISTORIAL'}={}){
+function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false,confirmValue=true,promptValue='BORRAR HISTORIAL',native=false}={}){
   const storage=memory();storage.setItem('gpsGoogleConfigV1',JSON.stringify(withoutSavedIds?{consent}:{clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',consent}));storage.setItem('gpsTrackerState',JSON.stringify({days:{original:'preserved'},geoapifyKey:'local-only-secret'}));
-  const elements=new Map(),requests=[],timers=new Map();let timer=0,revoked=false;
+  const elements=new Map(),requests=[],timers=new Map(),windowEvents={},documentEvents={},oauth=[];let timer=0,revoked=false;
   function element(id){if(!elements.has(id))elements.set(id,{value:'',checked:false,textContent:'',disabled:false,listeners:{},addEventListener(name,cb){this.listeners[name]=cb;}});return elements.get(id);}
-  const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:()=>{},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:()=>options.callback({access_token:'memory-token',expires_in:3600})})}}}};
-  const ctx=vm.createContext({window:win,document:{getElementById:element},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>confirmValue,prompt:()=>promptValue,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
+  const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:(name,fn)=>{windowEvents[name]=fn;},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:request=>{oauth.push({options,request});return options.callback({access_token:'memory-token',expires_in:3600});}})}}}};
+  if(native)win.GpsSession={validUrl:()=>true,Bridge:class{async connect(){}close(){}async call(request){requests.push({native:true,request});return s.call(request);}}};
+  const ctx=vm.createContext({window:win,document:{getElementById:element,addEventListener:(name,fn)=>{documentEvents[name]=fn;},hidden:false},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>confirmValue,prompt:()=>promptValue,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
     const request=JSON.parse(options.body);requests.push({url,options,request});
     return {ok:httpStatus===200,status:httpStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
   }});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../gps-google.js'),'utf8'),ctx);
   const current=snapshot('Privada'),diagnostics=[];
   const api=win.GpsGoogle.init({snapshot:()=>current,apply:events=>{for(const e of events)current[e.entityId]={kind:e.kind,value:e.value};},clearHistoryBefore:cutoff=>{for(const [id,e] of Object.entries(current))if(e.kind==='record'&&e.value.timestamp<=cutoff)delete current[id];},save:()=>true,render:()=>{},diagnostic:message=>diagnostics.push(message)});
-  return {api,current,storage,requests,element,diagnostics,click:id=>element(id).listeners.click(),revoked:()=>revoked};
+  return {api,current,storage,requests,element,diagnostics,oauth,emit:name=>windowEvents[name]?.(),visible:()=>documentEvents.visibilitychange?.(),click:id=>element(id).listeners.click(),revoked:()=>revoked};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
 test('new device uses published service configuration without entering identifiers',async()=>{
@@ -294,3 +295,109 @@ test('previously synchronized records with an incorrect future timestamp cannot 
   assert.equal(s.data.length,1);assert.equal(Object.keys(current).length,0);assert.equal(a.e.data.pending.length,0);
 });
 
+
+test('location names synchronize, rename, remove once and preserve GPS identities',async()=>{
+  const s=server(),a=client(s),key='4.600000,-74.100000';await a.e.bind();
+  a.e.observe(entities([point],[],{},{[key]:'Casa'}));await a.e.sync();
+  const record=JSON.stringify(s.data.find(row=>row[3]==='record'));
+  const b=client(s);await b.e.bind();await b.e.sync();assert.equal(b.applied.find(e=>e.kind==='name').value.name,'Casa');
+  a.e.observe(entities([point],[],{},{[key]:'Oficina'}));await a.e.sync();
+  a.e.observe(entities([point],[],{},{}));await a.e.sync();
+  const before=s.data.length;a.e.observe(entities([point],[],{},{}));await a.e.sync();assert.equal(s.data.length,before);
+  assert.equal(JSON.stringify(s.data.find(row=>row[3]==='record')),record);
+  assert.deepEqual(s.data.filter(row=>row[3]==='name').map(row=>JSON.parse(row[8]).name),['Casa','Oficina','']);
+});
+test('a confirmed history clear retains all name metadata exactly',async()=>{
+  const s=server(),a=client(s);await a.e.bind();a.e.observe(entities([point],[],{},{'4.600000,-74.100000':'Casa'}));await a.e.sync();
+  const nameRow=JSON.stringify(s.data.find(row=>row[3]==='name'));
+  const plan=await a.e.request({action:'prepareHistoryClear'});await a.e.clearHistory(plan.ticket);
+  assert.equal(JSON.stringify(s.data.find(row=>row[3]==='name')),nameRow);assert.equal(s.data.some(row=>row[3]==='record'),false);
+});
+test('legacy clients are blocked before reading new name entities',async()=>{
+  const s=server(),a=client(s);await a.e.bind();a.e.observe(entities([],[],{},{'4.600000,-74.100000':'Casa'}));await a.e.sync();
+  for(const action of ['list','push','prepareHistoryClear','clearHistory'])assert.throws(()=>s.call({action,clientVersion:2,cursor:0}),/GPS_CLIENT_UPDATE_REQUIRED/);
+  assert.equal(s.call({action:'list',clientVersion:3,historyEpoch:'initial',cursor:0}).events[0].value.name,'Casa');
+});
+test('before backend activation, names stay durable without blocking existing synchronization',async()=>{
+  const s=server();let health={};const a=client(s,{send:async req=>{
+    assert.equal(req.clientVersion,2);
+    if(req.action==='push')assert.ok(req.operations.every(op=>op.kind!=='name'));
+    const result=s.call(req);if(req.action==='status'){delete result.features.names;health=result;}return result;
+  }});
+  await a.e.bind();a.e.observe(entities([point],[],{},{'4.600000,-74.100000':'Casa'}));await a.e.sync();
+  assert.equal(s.data.length,2);assert.equal(a.e.data.pending.length,1);assert.equal(a.e.data.pending[0].value.name,'Casa');
+  const b=client(s,{storage:a.storage});await b.e.bind();await b.e.sync();assert.equal(s.data.length,3);assert.equal(b.e.data.pending.length,0);
+});
+test('name validation rejects malformed coordinates and writes inert JSON',()=>{
+  const s=server(),op={operationId:'name_operation_123',device:'device_123456',entityId:'name|4.600000,-74.100000',kind:'name',value:{name:'  =IMPORTXML("private")  '},base:0};
+  assert.throws(()=>s.call({action:'push',clientVersion:3,historyEpoch:'initial',operations:[{...op,entityId:'name|4.6,-74.1'}]}),/GPS_INVALID_NAME_ID/);
+  s.call({action:'push',clientVersion:3,historyEpoch:'initial',operations:[op]});assert.equal(JSON.parse(s.data[1][8]).name,'=IMPORTXML("private")');assert.ok(s.data[1][8].startsWith('{'));
+});
+test('OAuth reuses the authorized account without forcing account selection',async()=>{
+  const a=adapter(server(),{consent:true});a.click('googleConnectBtn');await settle();
+  assert.equal(a.oauth[0].request.prompt,'');assert.equal(JSON.parse(a.storage.getItem('gpsGoogleConfigV1')).loginHint,'owner@example.test');
+  a.emit('pageshow');a.visible();a.emit('online');await settle();assert.equal(a.oauth.length,1);assert.equal(a.api.connected(),true);
+  a.click('googleDisconnectBtn');assert.equal(JSON.parse(a.storage.getItem('gpsGoogleConfigV1')).loginHint,undefined);
+});
+test('activated private session connects and syncs on startup without GIS or a manual click',async()=>{
+  const a=adapter(server(),{consent:true,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
+  await settle();assert.equal(a.api.connected(),true);assert.ok(a.requests.length>=3);assert.ok(a.requests.every(r=>r.native));assert.equal(a.oauth.length,0);
+  assert.ok(!a.storage.getItem('gpsGoogleConfigV1').includes('token'));assert.ok(a.storage.getItem('gpsSyncBackupV1'));
+  a.click('googleDisconnectBtn');const before=a.requests.length;a.emit('pageshow');a.visible();await settle();assert.equal(a.requests.length,before);assert.equal(a.api.connected(),false);
+});
+test('a private session never starts before consent',async()=>{
+  const a=adapter(server(),{consent:false,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
+  a.emit('pageshow');a.visible();await settle();assert.equal(a.requests.length,0);assert.equal(a.oauth.length,0);
+});
+test('private bridge server requires the active owner and never emits credentials',()=>{
+  const s=server(),nonce='a'.repeat(64),html=s.bridgePage(nonce);
+  assert.ok(html.includes('https://gruemp.github.io'));assert.ok(html.includes('event.source!==window.top'));assert.ok(!html.includes('private-sheet'));assert.ok(!html.includes('access_token'));
+  s.active('');assert.throws(()=>s.bridgePage(nonce),/GPS_FORBIDDEN/);assert.throws(()=>s.callBridge({action:'status'}),/GPS_FORBIDDEN/);
+  s.active('intruder@example.test');assert.throws(()=>s.bridgePage(nonce),/GPS_FORBIDDEN/);
+});
+function bridgeHarness(){
+  const listeners={},frames=[],timers=new Map();let next=0;
+  const win={addEventListener:(n,fn)=>{listeners[n]=fn;},removeEventListener:n=>{delete listeners[n];}};
+  const ctx=vm.createContext({window:win,crypto:require('node:crypto').webcrypto,Uint8Array,document:{createElement:()=>({remove(){this.removed=true;}}),body:{append:f=>frames.push(f)}},setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id)});
+  vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../gps-session.js'),'utf8'),ctx);
+  const bridge=new win.GpsSession.Bridge('https://script.google.com/macros/s/bridge_deployment_1234567890/exec');
+  return {bridge,win,listeners,frames,timers,emit:event=>listeners.message?.(event)};
+}
+test('private transport rejects forged messages, correlates responses and cancels pending calls',async()=>{
+  const h=bridgeHarness(),connection=h.bridge.connect(),nonce=new URL(h.frames[0].src).searchParams.get('gps_nonce');let ready=false;connection.then(()=>{ready=true;});
+  const sent=[],source={top:h.win,postMessage:(data,origin)=>sent.push({data,origin})},origin='https://example-script.googleusercontent.com';
+  h.emit({origin:'https://evil.test',source,data:{type:'control-gps-ready',nonce}});
+  h.emit({origin,source,data:{type:'control-gps-ready',nonce:'b'.repeat(64)}});await settle();assert.equal(ready,false);
+  h.emit({origin,source,data:{type:'control-gps-ready',nonce}});await connection;
+  const call=h.bridge.call({action:'status'});await settle();assert.equal(sent.length,1);assert.equal(sent[0].origin,origin);
+  const data={type:'control-gps-result',nonce,id:sent[0].data.id,result:{service:'control-gps'}};
+  h.emit({origin,source:{top:h.win},data});assert.equal(h.bridge.pending.size,1);
+  h.emit({origin,source,data});assert.equal((await call).service,'control-gps');
+  const pending=h.bridge.call({action:'list',cursor:0});await settle();h.bridge.close();await assert.rejects(pending,/cancelada/);assert.equal(h.frames[0].removed,true);assert.equal(h.listeners.message,undefined);
+});
+test('blocked private Google session times out without exposing data or starting OAuth popups',async()=>{
+  const h=bridgeHarness(),pending=h.bridge.connect();const timeout=[...h.timers.values()][0];timeout();await assert.rejects(pending,/recuperar la sesión/);assert.equal(h.frames[0].removed,true);assert.equal(h.bridge.pending.size,0);
+});
+
+test('a custom location name is plain text in the card header with capture time retained',()=>{
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../inicio.html'),'utf8');
+  const start=html.indexOf('      function locationCard('),end=html.indexOf('      function renderRecords',start);
+  const name='<img src=x onerror=alert(1)>',nodes=[];
+  function node(tag){const n={tag,children:[],className:'',dataset:{},classList:{add(){}},append(...children){this.children.push(...children);},addEventListener(){}};nodes.push(n);return n;}
+  const ctx={state:{names:{'4.600000,-74.100000':name},favorites:[],currentFix:null},addressKey:()=> '4.600000,-74.100000',fmtTime:()=>'',document:{createElement:node},uiIcon:()=>node('svg'),uiText:(tag,text,className)=>Object.assign(node(tag),{textContent:text,className}),addressOf:()=>'',formatCoords:()=>'',mapLink:()=>'',externalAction:()=>node('a'),actionButton:(label)=>Object.assign(node('button'),{textContent:label})};
+  vm.runInNewContext(html.slice(start,end)+'\nlocationCard('+JSON.stringify(point)+');',ctx);
+  const title=nodes.find(n=>n.className==='location-title'),subtitle=nodes.find(n=>n.className==='location-subtitle');
+  assert.equal(title.textContent,name);assert.equal(title.innerHTML,undefined);assert.match(subtitle.textContent,/ · .*:/);assert.ok(nodes.some(n=>n.textContent==='Cambiar nombre'));
+});
+test('names persist in local state and export, and JSON import adds them without replacing existing names',async()=>{
+  const html=fs.readFileSync(require('node:path').join(__dirname,'../inicio.html'),'utf8');
+  const state={days:{},favorites:[],addresses:{},names:{'4.600000,-74.100000':'Casa'},accuracyLimit:100};let saved,blob,rendered=0;
+  const storage={setItem:(key,value)=>{saved=JSON.parse(value);}},a={click(){},remove(){}};
+  const ctx={state,localStorage:storage,KEY:'gpsTrackerState',allLocations:()=>[],cloud:null,setDiagnostic(){},Blob,URL:{createObjectURL:value=>{blob=value;return 'blob:local';},revokeObjectURL(){}},document:{createElement:()=>a,body:{append(){}}},dateKey:()=> '2026-10-31',setTimeout(){},mergeLocations:()=>0,itemsFromJson:()=>[],el:()=>({}),valid:()=>false,renderAll:()=>{rendered++;}};
+  const start=html.indexOf('      function store()'),end=html.indexOf('      function setDiagnostic',start);
+  const importStart=html.indexOf('      async function importText'),exportEnd=html.indexOf("      document.querySelectorAll('.tab')",importStart);
+  vm.runInNewContext(html.slice(start,end)+html.slice(importStart,exportEnd)+'\nstore();exportData();',ctx);
+  assert.equal(saved.names['4.600000,-74.100000'],'Casa');assert.equal(JSON.parse(await blob.text()).names['4.600000,-74.100000'],'Casa');
+  ctx.input=JSON.stringify({locations:[],names:{'4.600000,-74.100000':'No reemplazar','40.758000,-73.985500':'Times Square','bad':'inválido'}});
+  await vm.runInNewContext('importText(input,true)',ctx);assert.equal(state.names['4.600000,-74.100000'],'Casa');assert.equal(state.names['40.758000,-73.985500'],'Times Square');assert.equal(state.names.bad,undefined);assert.ok(rendered>0);
+});

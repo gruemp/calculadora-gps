@@ -9,11 +9,12 @@
   const conflictId=event=>event.operationId||event.seq;
   const pointId=p=>[Number(p.timestamp),Number(p.latitude),Number(p.longitude)].join('|');
   const addressId=p=>Number(p.latitude).toFixed(6)+','+Number(p.longitude).toFixed(6);
-  function entities(records,favorites,addresses){
+  function entities(records,favorites,addresses,names={}){
     const result={};
     for(const p of records)result['record|'+pointId(p)]={kind:'record',value:{...p}};
     for(const p of favorites)result['favorite|'+pointId(p)]={kind:'favorite',value:{...p,enabled:true}};
     for(const [k,v] of Object.entries(addresses))if(v&&typeof v.address==='string')result['address|'+k]={kind:'address',value:{...v}};
+    for(const [k,v] of Object.entries(names))if(typeof v==='string'&&v.trim())result['name|'+k]={kind:'name',value:{name:v.trim().slice(0,100)}};
     return result;
   }
   class Engine{
@@ -22,10 +23,10 @@
       this.data=JSON.parse(storage.getItem(KEY)||'null')||{version:1,device:uuid(),cursor:0,observed:{},pending:[],revisions:{},audit:[]};
       const seen=new Set();
       this.data.audit=this.data.audit.filter(event=>{const id=conflictId(event);if(seen.has(id))return false;seen.add(id);return true;});
-      this.busy=false;this.ready=false;
+      this.busy=false;this.ready=false;this.clientVersion=2;
     }
     persist(){this.storage.setItem(KEY,JSON.stringify(this.data));}
-    request(request){return this.send({...request,clientVersion:2,historyEpoch:this.data.historyEpoch||'initial'});}
+    request(request){return this.send({...request,clientVersion:this.clientVersion,historyEpoch:this.data.historyEpoch||'initial'});}
     async acceptHistory(info){
       const epoch=info.historyEpoch||'initial',cutoff=Number(info.historyClearedAt)||0;
       if(typeof epoch!=='string'||!Number.isSafeInteger(cutoff)||cutoff<0)throw Error('Estado de borrado remoto inválido.');
@@ -45,7 +46,7 @@
       if(health?.service!=='control-gps'||health.version!==1||!health.dataset||!health.actor)throw Error('Servicio incompatible.');
       const binding=health.dataset+'|'+health.actor;
       if(this.data.binding&&this.data.binding!==binding)throw Error('La cuenta o la hoja no coincide con la conexión anterior. Conserva la copia y usa otro perfil del navegador.');
-      await this.acceptHistory(health);this.features=health.features||{};
+      await this.acceptHistory(health);this.features=health.features||{};this.clientVersion=this.features.names?3:2;
       this.data.binding=binding;this.persist();this.ready=true;return health;
     }
     observe(current){
@@ -56,7 +57,7 @@
         if(!same(before[id],entity))this.queue(id,entity);
       }
       for(const [id,entity] of Object.entries(before))if(!current[id]&&entity.kind!=='record'){
-        const value=entity.kind==='favorite'?{...entity.value,enabled:false}:{address:'',source:'manual'};
+        const value=entity.kind==='favorite'?{...entity.value,enabled:false}:entity.kind==='name'?{name:''}:{address:'',source:'manual'};
         // Observe a removal once, while retaining its remote tombstone.
         this.queue(id,{kind:entity.kind,value});
       }
@@ -73,7 +74,8 @@
         // Pull before uploading: existing local changes remain protected by the queue.
         await this.pull();
         for(let count=0;this.ready&&this.data.pending.length&&count<20;count++){
-          const batch=this.data.pending.slice(0,50);
+          const batch=this.data.pending.filter(p=>p.kind!=='name'||this.features.names).slice(0,50);
+          if(!batch.length)break;
           const result=await this.request({action:'push',operations:batch});
           if(result?.reset){await this.acceptHistory(result);await this.pull();continue;}
           if(!Array.isArray(result?.ack))throw Error('Falta confirmación del servidor.');
@@ -82,7 +84,7 @@
           if(!batch.some(p=>ack.has(p.operationId)))throw Error('El servidor no confirmó las operaciones.');
           await this.pull();
         }
-        this.status(this.data.pending.length?'Hay cambios pendientes.':'Sincronizado con Google Sheets.');
+        this.status(this.data.pending.length?(this.data.pending.every(p=>p.kind==='name')&&!this.features.names?'Historial sincronizado. Nombres guardados en este dispositivo; sincronización de nombres pendiente.':'Hay cambios pendientes.'):'Sincronizado con Google Sheets.');
       }finally{this.busy=false;}
     }
     async pull(){
@@ -99,7 +101,7 @@
           if(event.conflict&&!next.audit.some(item=>conflictId(item)===conflictId(event)))next.audit.push(clone(event));
           if(!pending){
             changes.push(event);
-            if((event.kind==='favorite'&&event.value.enabled===false)||(event.kind==='address'&&!event.value.address))delete next.observed[event.entityId];
+            if((event.kind==='favorite'&&event.value.enabled===false)||(event.kind==='address'&&!event.value.address)||(event.kind==='name'&&!event.value.name))delete next.observed[event.entityId];
             else next.observed[event.entityId]={kind:event.kind,value:clone(event.value)};
           }
         }

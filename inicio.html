@@ -388,9 +388,10 @@
     </section>
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
-  <script src="gps-sync.js?v=20261031-history-clear-2"></script>
+  <script src="gps-sync.js?v=20261031-auto-names-1"></script>
+  <script src="gps-session.js?v=20261031-auto-names-1"></script>
   <script src="gps-google-service.js"></script>
-  <script src="gps-google.js?v=20261031-history-clear-2"></script>
+  <script src="gps-google.js?v=20261031-auto-names-1"></script>
   <script>
     (function () {
       'use strict';
@@ -415,6 +416,7 @@
         showFavorites: saved.showFavorites !== false,
         accuracyLimit: Number.isFinite(num(saved.accuracyLimit)) && num(saved.accuracyLimit)>=5 && num(saved.accuracyLimit)<=5000 ? num(saved.accuracyLimit) : 100,
         addresses: saved.addresses && typeof saved.addresses==='object' && !Array.isArray(saved.addresses) ? saved.addresses : {},
+        names: saved.names && typeof saved.names==='object' && !Array.isArray(saved.names) ? Object.fromEntries(Object.entries(saved.names).filter(([,v])=>typeof v==='string').map(([k,v])=>[k,v.trim().slice(0,100)])) : {},
         legacyDetails: saved.locationDetails && typeof saved.locationDetails==='object' ? saved.locationDetails : null,
         currentFix: null, selectedMeasure: null,
         mapView: saved.mapView || null,
@@ -449,7 +451,7 @@
             days:state.days,favorites:state.favorites,lastLocation:state.lastLocation,
             cycleDuration:state.cycleDuration,autoStart:state.autoStart,darkMode:state.darkMode,
             showFavorites:state.showFavorites,mapView:state.mapView,
-            accuracyLimit:state.accuracyLimit,addresses:state.addresses,
+            accuracyLimit:state.accuracyLimit,addresses:state.addresses,names:state.names,
             ...(state.legacyDetails?{locationDetails:state.legacyDetails}:{}),
             cyclesCompleted:allLocations().length
           }));
@@ -467,16 +469,17 @@
       }
       function mergeLocations(items) {
         const keys = new Set(allLocations().map((p) => [p.timestamp,p.latitude,p.longitude].join('|')));
-        let added=0,addressAdded=0;
+        let added=0,addressAdded=0,namesAdded=0;
         for (const input of items) {
           if (!valid(input)) continue;
           const loc=normalize(input), key=[loc.timestamp,loc.latitude,loc.longitude].join('|');
           const rawAddress=typeof input.address==='string'?input.address.trim().slice(0,250):'';
           if(rawAddress){const ak=addressKey(loc);if(!state.addresses[ak]){state.addresses[ak]={address:rawAddress,source:'importada'};addressAdded++;}}
+          if(typeof input.name==='string'&&input.name.trim()&&!state.names[addressKey(loc)]){state.names[addressKey(loc)]=input.name.trim().slice(0,100);namesAdded++;}
           if (keys.has(key)) continue;
           keys.add(key);appendLocation(loc);added++;
         }
-        if (added||addressAdded) { store();renderAll(true); }
+        if (added||addressAdded||namesAdded) { store();renderAll(true); }
         return added;
       }
       function readableError(e) {
@@ -615,7 +618,15 @@
         }catch(err){setDiagnostic('No se pudo medir: '+readableError(err));}
         finally{b.disabled=false;b.textContent='Medir desde mi ubicación';}
       }
-      function labelFor(p){const found=state.favorites.find(f=>valid(f)&&Number(f.timestamp)===Number(p.timestamp)&&addressKey(f)===addressKey(p));return found&&found.label?'Favorito: '+found.label:'Registro GPS';}
+      function editName(p){
+        const k=addressKey(p),current=state.names[k]||'';
+        const value=prompt('Nombre de esta ubicación (máximo 100 caracteres). Déjalo vacío para quitarlo:',current);
+        if(value===null)return;
+        const name=value.trim().slice(0,100);
+        if(name)state.names[k]=name;else delete state.names[k];
+        store();renderAll();setDiagnostic(name?'Nombre de ubicación guardado.':'Nombre de ubicación retirado.');
+      }
+      function labelFor(p){if(state.names[addressKey(p)])return state.names[addressKey(p)];const found=state.favorites.find(f=>valid(f)&&Number(f.timestamp)===Number(p.timestamp)&&addressKey(f)===addressKey(p));return found&&found.label?'Favorito: '+found.label:'Registro GPS';}
       function dataFor(p){
         const record=['CONTROL GPS — '+labelFor(p),'Fecha y hora: '+fmtTime(p.timestamp),'Coordenadas GPS: '+formatCoords(p)];
         record.push('Precisión del registro: '+(Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'No informada'));
@@ -702,10 +713,11 @@
         heading.append(uiText('div',isFavorite?'UBICACIÓN FAVORITA':'REGISTRO GPS','location-kicker'));
         const title=document.createElement('strong');title.className='location-title';
         const favoriteLabel=String(p.label||'').trim();
-        title.textContent=isFavorite&&favoriteLabel&&favoriteLabel!==fmtTime(p.timestamp)?favoriteLabel:new Date(p.timestamp).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit',second:'2-digit'});
+        const customName=state.names[addressKey(p)]||'';
+        title.textContent=customName||(isFavorite&&favoriteLabel&&favoriteLabel!==fmtTime(p.timestamp)?favoriteLabel:new Date(p.timestamp).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit',second:'2-digit'}));
         heading.append(title);
         // La lista es plana, por lo que cada ubicación muestra su fecha.
-        heading.append(uiText('div',new Date(p.timestamp).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}),'location-subtitle'));
+        heading.append(uiText('div',new Date(p.timestamp).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})+(customName?' · '+new Date(p.timestamp).toLocaleTimeString('es-CO'):''),'location-subtitle'));
         identity.append(pin,heading);
         const quality=document.createElement('span');quality.className='location-accuracy';
         quality.append(uiIcon('target'),uiText('span',Number.isFinite(p.accuracy)?'±'+Math.round(p.accuracy)+' m':'Precisión desconocida'));
@@ -737,6 +749,7 @@
         );
         const tools=document.createElement('div');tools.className='location-tools';
         tools.append(
+          actionButton(customName?'Cambiar nombre':'Nombrar ubicación','edit',()=>editName(p)),
           actionButton('Editar dirección','edit',()=>editAddress(p)),
           actionButton('Buscar dirección','search',()=>lookupAddress(p))
         );
@@ -828,7 +841,7 @@
           const numericTimestamp=Number(rawTimestamp);
           const timestamp=rawTimestamp?(Number.isFinite(numericTimestamp)&&numericTimestamp>0?(numericTimestamp<1e11?numericTimestamp*1000:numericTimestamp):Date.parse(rawTimestamp)):
             parseTimestamp(field(row,['fecha','date']),field(row,['hora','time']));
-          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null,address:field(row,['direccion','direccion completa','direccion aproximada','address','full address'])||''};
+          return {latitude:lat,longitude:lng,timestamp:timestamp,accuracy:field(row,['precision','accuracy'])||null,name:field(row,['nombre','name','nombre de ubicacion'])||'',address:field(row,['direccion','direccion completa','direccion aproximada','address','full address'])||''};
         }).filter(valid);
       }
       function itemsFromJson(text) {
@@ -854,17 +867,26 @@
           }
           if(addressesAdded){store();renderAll();}
         }
+        let namesAdded=0;
+        if(data&&data.names&&typeof data.names==='object'&&!Array.isArray(data.names)){
+          for(const [k,v] of Object.entries(data.names)){
+            const coords=k.split(',').map(Number);
+            if(coords.length!==2||!coords.every(Number.isFinite)||Math.abs(coords[0])>90||Math.abs(coords[1])>180||k!==coords[0].toFixed(6)+','+coords[1].toFixed(6)||typeof v!=='string'||!v.trim()||state.names[k])continue;
+            state.names[k]=v.trim().slice(0,100);namesAdded++;
+          }
+          if(namesAdded){store();renderAll();}
+        }
         let favoritesAdded=0;
         if(data && Array.isArray(data.favorites)){
           const known=new Set(state.favorites.map((p)=>[p.timestamp,p.latitude,p.longitude].join('|')));
           data.favorites.forEach((f)=>{if(!valid(f))return;const p=Object.assign(normalize(f),{label:String(f.label||'')});const key=[p.timestamp,p.latitude,p.longitude].join('|');if(!known.has(key)){known.add(key);state.favorites.push(p);favoritesAdded++;}});
           if(favoritesAdded){store();renderAll(true);}
         }
-        const message='Importación: '+count+' registros, '+favoritesAdded+' favoritos y '+addressesAdded+' direcciones nuevas.';
+        const message='Importación: '+count+' registros, '+favoritesAdded+' favoritos y '+addressesAdded+' direcciones y '+namesAdded+' nombres nuevos.';
         el('importStatus').textContent=message;setDiagnostic(message);
       }
       function exportData() {
-        const json=JSON.stringify({version:4,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,addresses:state.addresses,accuracyLimit:state.accuracyLimit,...(state.legacyDetails?{locationDetails:state.legacyDetails}:{})},null,2);
+        const json=JSON.stringify({version:5,exportDate:new Date().toISOString(),days:state.days,favorites:state.favorites,addresses:state.addresses,names:state.names,accuracyLimit:state.accuracyLimit,...(state.legacyDetails?{locationDetails:state.legacyDetails}:{})},null,2);
         const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
         const a=document.createElement('a');a.href=url;a.download='control-gps-'+dateKey(Date.now())+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
       }
@@ -899,14 +921,14 @@
       el('clearBtn').addEventListener('click',()=>{
         if(!confirm('¿Eliminar TODOS los registros y favoritos guardados en este navegador? Esta acción no se puede deshacer.'))return;
         if(cloud&&!cloud.prepareLocalClear())return;
-        state.days={};state.favorites=[];state.addresses={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;
+        state.days={};state.favorites=[];state.addresses={};state.names={};state.currentFix=null;state.selectedMeasure=null;state.lastLocation=null;
         store();renderAll(true);setDiagnostic('Se eliminaron los datos locales. No se modificó ninguna hoja externa.');
       });
       document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state.isRunning)tick();});
       // Keep Google optional: failure loading its adapter never blocks local GPS.
       if(window.GpsSync&&window.GpsGoogle){
         cloud=window.GpsGoogle.init({
-          snapshot:()=>window.GpsSync.entities(allLocations(),state.favorites,state.addresses),
+          snapshot:()=>window.GpsSync.entities(allLocations(),state.favorites,state.addresses,state.names),
           apply:events=>{
             const known=new Set(allLocations().map(window.GpsSync.pointId));
             for(const event of events){
@@ -917,6 +939,9 @@
                 if(p.enabled===false){if(index>=0)state.favorites.splice(index,1);}
                 else if(index>=0)state.favorites[index]=Object.assign(normalize(p),{label:String(p.label||'')});
                 else state.favorites.push(Object.assign(normalize(p),{label:String(p.label||'')}));
+              }else if(event.kind==='name'){
+                const k=event.entityId.slice(5);
+                if(p.name)state.names[k]=String(p.name).slice(0,100);else delete state.names[k];
               }else if(event.kind==='address'){
                 const k=event.entityId.slice(8);
                 if(p.address)state.addresses[k]={...p};else delete state.addresses[k];

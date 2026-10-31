@@ -87,3 +87,11 @@ Toda la aplicación usa **un único desplazamiento vertical de la página**: el 
 
 El historial muestra directamente las tarjetas GPS ordenadas de la más reciente a la más antigua, con fecha y hora completas; no hay filtros ni grupos plegables por día/hora. Se han retirado los botones de copiar/compartir masivamente, el importador CSV por URL y la configuración de Geoapify. Siguen disponibles los botones de copiar/compartir de cada ubicación, la importación local de archivos JSON/CSV, la edición manual de direcciones y la búsqueda opcional de direcciones por Google autenticado. Los registros y favoritos existentes no se eliminan por este cambio.
 
+
+## Nombres y sesión de Google
+
+Cada tarjeta permite **Nombrar ubicación** o **Cambiar nombre**. El nombre aparece en su encabezado; la fecha y hora se conservan debajo. Los nombres se incluyen en las copias e importaciones locales. El diseño y las funciones de medición permanecen iguales.
+
+La app sincroniza al regresar a primer plano cuando la sesión sigue válida y deja de forzar la selección de cuenta en cada conexión. **La recuperación automática después de cerrar/recargar y la sincronización de nombres con Sheets siguen pendientes de activación y prueba en Google:** la sesión propietaria del navegador conectado está cerrada. Hasta actualizar ese servicio, los nombres quedan conservados en el dispositivo y en su cola, sin bloquear el historial, los favoritos ni las direcciones.
+
+Hay 48 pruebas locales aprobadas. El estado y los pasos de activación están en [Integración pendiente](INTEGRACION_APPS_SCRIPT_PENDIENTE.md) y [Apps Script](apps-script/README.md). El transporte nativo preparado permanece desactivado (`sessionBridgeUrl` vacío); no se crearon recursos de Google ni se eliminaron registros reales en esta revisión.

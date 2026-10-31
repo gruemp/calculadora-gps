@@ -1,5 +1,27 @@
 # Integración pendiente: Apps Script y Google Sheets para Control GPS
 
+## Nombres y recuperación de sesión: estado de esta revisión
+
+La interfaz permite **Nombrar ubicación / Cambiar nombre**. El nombre se muestra en el encabezado de la tarjeta, conservando fecha y hora debajo, y se comparte entre capturas y favoritos de las mismas coordenadas a seis decimales. Se conserva en `gpsTrackerState`, las copias JSON versión 5 y la importación JSON/CSV local. Vaciar el nombre no borra la ubicación, y borrar solo el historial conserva nombres, favoritos y direcciones.
+
+El cliente deja de forzar `select_account`: solicita `prompt: ''` y recuerda exclusivamente la cuenta ya validada como `login_hint` local. Al regresar de navegación, recuperar conexión o restaurar una página, sincroniza inmediatamente si la sesión sigue válida. No guarda tokens OAuth, contraseñas ni refresh tokens en almacenamiento, archivos o URLs. Google todavía puede requerir una autorización legítima.
+
+**Activación en Google pendiente.** La sesión propietaria del navegador conectado apareció cerrada y la solicitud segura de acceso no llegó a completarse. No se pudo actualizar el backend desplegado ni comprobar una reconexión real en esta revisión. El API activo sigue en versión 2. El código del repositorio añade soporte `name` y negociación de cliente 2/3; hasta actualizar ese API, los nombres se guardan localmente y en una cola duradera, sin impedir la sincronización existente del historial, favoritos y direcciones. No se deben presentar los nombres como sincronizados con la hoja todavía.
+
+`gps-session.js` y las funciones `doGet`/`gpsBridgeApi` preparan un transporte con la sesión nativa de Google. **No está activado:** `sessionBridgeUrl` sigue vacío, sin valores inventados. La prueba simulada comprueba inicio automático, correlación de solicitudes, validación de origen/nonce, cancelación y ausencia de credenciales en mensajes. No demuestra que las cookies, el iframe y el acceso privado funcionen en Chrome o Android reales.
+
+Para terminar desde la sesión autorizada del propietario:
+
+1. Actualizar el código del mismo proyecto de Apps Script con `apps-script/control-gps.gs`, manteniendo propiedades privadas y scopes; actualizar la misma implementación API ejecutable. No crear otra hoja ni proyecto.
+2. Si se utiliza el transporte de sesión, añadir solo la implementación web necesaria en ese mismo proyecto, con **ejecutar como usuario que accede (`USER_ACCESSING`) y acceso Solo yo (`MYSELF`)**. No habilitar acceso anónimo ni ejecutar como propietario para otros usuarios. Ambos correos, activo y efectivo, se comprueban en el servidor. No se transmite ningún token OAuth al sitio; cada solicitud atraviesa los controles existentes de `gpsApi`.
+3. Recuperar su URL real y verificar la comunicación privada con `https://gruemp.github.io` mediante origen exacto y nonce aleatorio. Publicarla en `sessionBridgeUrl` únicamente tras comprobarla. Si el navegador bloquea la sesión en iframe, mantener OAuth interactivo y documentar ese límite; no debilitar los permisos ni afirmar acceso automático garantizado.
+4. Probar apertura, recarga, regreso de Google Maps, caducidad, desconexión/reconexión y nombres desde Pages y Android. Utilizar un punto público de ensayo para lectura/escritura y restauración, sin borrar el historial del propietario. Repetir sincronización y contrastar las operaciones con una lectura independiente de la hoja.
+
+**Validación local de esta revisión: 48/48 pruebas aprobadas**, incluidos CSS idéntico, encabezado como texto seguro, persistencia y exportación/importación de nombres, sincronización/retirada idempotente, protección frente a clientes antiguos y compatibilidad con el backend anterior. Las pruebas destructivas siguen siendo simuladas. No se borró ningún registro real ni se amplió el acceso a datos privados en esta revisión.
+
+## Registro de comprobaciones anteriores
+
+
 **Estado vigente (2026-10-31, America/Bogota): configuración pública completada y conexión real desde Pages comprobada.** Se reutilizaron el proyecto Cloud estándar, el cliente OAuth web existente facilitado por el propietario, la hoja privada y la misma implementación API ejecutable, ahora en versión 2 con acceso «Solo yo». `gps-google-service.js` ya contiene ambos identificadores públicos. No se publicaron secretos ni identificadores de hojas, ni se crearon recursos adicionales. La consola Cloud sigue sin cargar en el navegador remoto, pero OAuth y la ejecución del backend se validaron desde la app publicada.
 
 El perfil Chrome de prueba, sin IDs guardados ni datos locales previos, recuperó 5 registros GPS, 4 favoritos activos y 2 direcciones. Sincronización repetida y recarga/reconexión conservaron los 21 eventos iniciales sin reenvíos duplicados. Se verificó la consulta de dirección del punto público de ensayo. Una escritura manual técnica sobre ese punto se confirmó como evento 22; su restauración exacta mediante Google, incluidos los metadatos originales, como evento 23. Se conservaron todos los eventos anteriores, sin conflictos nuevos y con 23 IDs de operación únicos. No se borraron registros ni se retiraron favoritos existentes. Suite local: 25/25. No se modificaron el diseño, la medición GPS ni las opciones eliminadas.

@@ -10,6 +10,8 @@
  */
 window.CONTROL_GPS_GOOGLE_SERVICE=Object.freeze({
   clientId:'142119703617-089dbvcvfblkf0cmlbkjdg358t0rjtsp.apps.googleusercontent.com',
-  deploymentId:'AKfycbwCROqvztyP393Th01zLu2W1SSRJ_ljM3_6qa1a8GOKGxfzR6cG-7A1m99hlD3RsjfV'
+  deploymentId:'AKfycbwCROqvztyP393Th01zLu2W1SSRJ_ljM3_6qa1a8GOKGxfzR6cG-7A1m99hlD3RsjfV',
+  // Pending owner-session deployment and live verification; never invent a URL.
+  sessionBridgeUrl:''
 });
 

@@ -1,4 +1,4 @@
-/** API executable, never an anonymous Web App. All helpers are inside the ACL boundary. */
+/** Private API: caller identity and Sheet permissions are checked on every request. */
 function gpsApi(request) {
   'use strict';
   var props=PropertiesService.getScriptProperties();
@@ -49,10 +49,11 @@ function gpsApi(request) {
     var sequenceFloor=Number(props.getProperty('GPS_EVENT_SEQUENCE'))||0;
     var lastSequence=Math.max(sequenceFloor,total?Number(sheet.getRange(total+1,1).getValues()[0][0]):0);
     function withHistory(value){return Object.assign(value,{historyEpoch:historyEpoch,historyClearedAt:historyClearedAt});}
-    if(action==='status'||action==='initialize')return withHistory({service:'control-gps',version:1,dataset:sheetId,actor:actor,events:total,features:{clearHistory:true}});
+    if(action==='status'||action==='initialize')return withHistory({service:'control-gps',version:1,dataset:sheetId,actor:actor,events:total,minClientVersion:Number(props.getProperty('GPS_MIN_CLIENT_VERSION'))||2,features:{clearHistory:true,names:true}});
+    if(['list','push','prepareHistoryClear','clearHistory'].indexOf(action)>=0&&Number(req.clientVersion||0)<Number(props.getProperty('GPS_MIN_CLIENT_VERSION')||0))throw Error('GPS_CLIENT_UPDATE_REQUIRED');
     if(action==='prepareHistoryClear'||action==='clearHistory'){
       if(actor!==owner)throw Error('GPS_FORBIDDEN');
-      if(req.clientVersion!==2)throw Error('GPS_CLIENT_UPDATE_REQUIRED');
+      if(!(req.clientVersion>=2))throw Error('GPS_CLIENT_UPDATE_REQUIRED');
       var previous=JSON.parse(props.getProperty('GPS_HISTORY_LAST_CLEAR')||'null');
       // An uncertain response is safe to retry, even after new records were captured.
       if(action==='clearHistory'&&previous&&previous.ticket===req.ticket)return previous.result;
@@ -75,8 +76,8 @@ function gpsApi(request) {
       return finishHistoryClear(pending);
     }
     if(action==='list'||action==='push'){
-      if(historyEpoch!=='initial'&&req.clientVersion!==2)throw Error('GPS_CLIENT_UPDATE_REQUIRED');
-      if(req.clientVersion===2&&req.historyEpoch!==historyEpoch)return withHistory({reset:true});
+      if(historyEpoch!=='initial'&&!(req.clientVersion>=2))throw Error('GPS_CLIENT_UPDATE_REQUIRED');
+      if(req.clientVersion>=2&&req.historyEpoch!==historyEpoch)return withHistory({reset:true});
     }
     function clean(entity) {
       if(!entity||typeof entity!=='object'||Array.isArray(entity))throw Error('GPS_INVALID_ENTITY');
@@ -89,6 +90,12 @@ function gpsApi(request) {
         var point={latitude:v.latitude,longitude:v.longitude,accuracy:v.accuracy,timestamp:v.timestamp};
         if(kind==='favorite'){point.label=String(v.label||'').slice(0,250);point.enabled=v.enabled!==false;}
         return {entityId:id,kind:kind,value:point};
+      }
+      if(kind==='name'){
+        var coordinates=id.slice(5).split(',').map(Number);
+        if(!id.startsWith('name|')||coordinates.length!==2||!coordinates.every(Number.isFinite)||Math.abs(coordinates[0])>90||Math.abs(coordinates[1])>180||id!=='name|'+coordinates[0].toFixed(6)+','+coordinates[1].toFixed(6))throw Error('GPS_INVALID_NAME_ID');
+        if(req.clientVersion<3||typeof v.name!=='string')throw Error('GPS_INVALID_NAME');
+        return {entityId:id,kind:kind,value:{name:v.name.trim().slice(0,100)}};
       }
       if(kind==='address'){
         var coords=id.slice(8).split(',').map(Number);
@@ -130,6 +137,8 @@ function gpsApi(request) {
       });
       if(total+fresh.length>50000)throw Error('GPS_ARCHIVE_REQUIRED');
       if(fresh.length){
+        // Older clients must never interpret a name as an address tombstone.
+        if(ops.some(function(op){return op.kind==='name';}))props.setProperty('GPS_MIN_CLIENT_VERSION','3');
         var needed=total+fresh.length+1,capacity=sheet.getMaxRows();
         if(needed>capacity)sheet.insertRowsAfter(capacity,needed-capacity);
         sheet.getRange(total+2,1,fresh.length,headers.length).setValues(fresh);SpreadsheetApp.flush();
@@ -163,3 +172,29 @@ function gpsApi(request) {
 /** Run once in the editor after configuring private Script Properties. */
 function gpsInitialize(){return gpsApi({action:'initialize'});}
 
+/** Optional private Web App, execute as USER_ACCESSING, access MYSELF.
+ * Never expose OAuth tokens. The embedded page accepts only the published app's origin.
+ * Keep the existing executable API for browsers that require interactive OAuth.
+ */
+function gpsBridgeOwner_(){
+  var owner=String(PropertiesService.getScriptProperties().getProperty('GPS_OWNER_EMAIL')||'').toLowerCase();
+  var active=String(Session.getActiveUser().getEmail()||'').toLowerCase();
+  var effective=String(Session.getEffectiveUser().getEmail()||'').toLowerCase();
+  if(!owner||active!==owner||effective!==owner)throw Error('GPS_FORBIDDEN');
+}
+function gpsBridgeApi(request){gpsBridgeOwner_();return gpsApi(request);}
+function doGet(e){
+  gpsBridgeOwner_();
+  var nonce=String(e&&e.parameter&&e.parameter.gps_nonce||'');
+  if(!/^[a-f0-9]{64}$/.test(nonce))return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><p>Sesión privada de Control GPS. Regresa a la aplicación.</p>');
+  var html='<!doctype html><meta charset="utf-8"><title>Sesión privada de Control GPS</title><script>'+
+    '(function(){"use strict";const origin="https://gruemp.github.io",nonce='+JSON.stringify(nonce)+';'+
+    'if(window.top===window)return;'+
+    'window.addEventListener("message",function(event){const d=event.data;'+
+    'if(event.origin!==origin||event.source!==window.top||!d||d.nonce!==nonce||d.type!=="control-gps-request"||typeof d.id!=="string")return;'+
+    'function reply(value){window.top.postMessage(Object.assign({type:"control-gps-result",nonce:nonce,id:d.id},value),origin);}'+
+    'google.script.run.withSuccessHandler(function(result){reply({result:result});}).withFailureHandler(function(error){'+
+    'const match=String(error&&error.message||"").match(/\\bGPS_[A-Z_]+\\b/);reply({error:match?match[0]:"GOOGLE_SERVICE_ERROR"});}).gpsBridgeApi(d.request);'+
+    '});window.top.postMessage({type:"control-gps-ready",nonce:nonce},origin);})();</script>';
+  return HtmlService.createHtmlOutput(html).setTitle('Sesión privada de Control GPS').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
