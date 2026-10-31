@@ -1,7 +1,10 @@
-/* OAuth access tokens live only in memory. Backend identity is configured locally. */
+/* OAuth access tokens live only in memory; public service IDs can be provisioned at deployment. */
 (function(root){
   'use strict';
   const CONFIG='gpsGoogleConfigV1';
+  const validService=(clientId,deploymentId)=>typeof clientId==='string'&&typeof deploymentId==='string'
+    &&/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId.trim())
+    &&/^[A-Za-z0-9_-]{20,200}$/.test(deploymentId.trim());
   const scopes=['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/userinfo.email'];
   let gisLoading;
   function loadGis(){
@@ -16,6 +19,11 @@
   function init({snapshot,apply,save,render,diagnostic}){
     const $=id=>document.getElementById(id);
     let config;try{config=JSON.parse(localStorage.getItem(CONFIG)||'{}');}catch{config={};}
+    const published=root.CONTROL_GPS_GOOGLE_SERVICE||{};
+    // Configuración publicada para todos los dispositivos, con compatibilidad con navegadores ya enlazados.
+    const chosen=validService(published.clientId,published.deploymentId)?published:
+      validService(config.clientId,config.deploymentId)?config:null;
+    const service=chosen?{clientId:chosen.clientId.trim(),deploymentId:chosen.deploymentId.trim()}:null;
     let token='',expires=0,engine=null,applying=false,timer,attempts=0,epoch=0,geoAt=0,geoCount=0,geoBusy=false,tabRelease;
     function status(message){$('googleSyncStatus').textContent=message+(engine?.data.audit.length?' Conflictos conservados: '+engine.data.audit.length+'.':'');}
     function persistConfig(){localStorage.setItem(CONFIG,JSON.stringify(config));}
@@ -27,7 +35,7 @@
       if(!token||Date.now()>=expires)throw Object.assign(Error('Sesión vencida. Pulsa Conectar con Google.'),{permanent:true});
       const session=epoch,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),45000);
       let res;
-      try{res=await fetch('https://script.googleapis.com/v1/scripts/'+encodeURIComponent(config.deploymentId)+':run',{
+      try{res=await fetch('https://script.googleapis.com/v1/scripts/'+encodeURIComponent(service.deploymentId)+':run',{
         method:'POST',mode:'cors',credentials:'omit',referrerPolicy:'no-referrer',signal:controller.signal,
         headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({function:'gpsApi',parameters:[request],devMode:false})
       });}finally{clearTimeout(timeout);}
@@ -80,19 +88,20 @@
         status('Cuenta autorizada. Sincronizando…');await run();
       }catch(error){stop('No conectado: '+error.message);}
     }
-    $('googleClientId').value=config.clientId||'';$('googleDeploymentId').value=config.deploymentId||'';
     $('googleConsent').checked=config.consent===true;$('googleAutoAddress').checked=config.autoAddress===true;
     $('googleConsent').addEventListener('change',()=>{
       config.consent=$('googleConsent').checked;persistConfig();
-      if(!config.consent)stop();else loadGis().then(()=>status('Acceso a Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
+      if(!config.consent)stop();
+      else if(!service)status('El propietario aún no ha activado el servicio de Google. Tus ubicaciones siguen guardadas localmente.');
+      else loadGis().then(()=>status('Acceso a Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
     });
     $('googleAutoAddress').addEventListener('change',()=>{config.autoAddress=$('googleAutoAddress').checked;persistConfig();});
     $('googleConnectBtn').addEventListener('click',()=>{
       if(!$('googleConsent').checked){status('Autoriza primero el envío de tus ubicaciones a la hoja privada.');return;}
-      const clientId=$('googleClientId').value.trim(),deploymentId=$('googleDeploymentId').value.trim();
-      if(!/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId)||!/^[A-Za-z0-9_-]{20,200}$/.test(deploymentId)){
-        status('Falta configurar el cliente OAuth y el ID del despliegue API ejecutable. No uses la URL /exec.');return;
+      if(!service){
+        status('El propietario debe activar la conexión de Google una sola vez. No tienes que introducir códigos. Tus datos permanecen locales.');return;
       }
+      const {clientId,deploymentId}=service;
       if(config.deploymentId&&config.deploymentId!==deploymentId&&localStorage.getItem(root.GpsSync.KEY)){
         status('Hay una conexión previa guardada. Usa otro perfil para otra hoja; no se mezclan historiales.');return;
       }
@@ -138,7 +147,10 @@
       finally{geoBusy=false;}
       return true;
     }
-    status('Sincronización desactivada. Configura el servicio y conecta para autorizar esta sesión.');
+    status(service
+      ? 'Sincronización desactivada. Autoriza el envío y pulsa Conectar con Google.'
+      : 'Sincronización local disponible. El propietario aún no ha activado el servicio privado de Google.');
+    if(service&&config.consent)loadGis().then(()=>status('Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
     function prepareLocalClear(){
       stop('Sincronización pausada al borrar información local. Reconectar recupera los registros remotos.');
       try{
