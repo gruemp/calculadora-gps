@@ -366,7 +366,7 @@
           <div class="setting-box">
             <h3>Google Sheets privado (opcional)</h3>
             <p>La conexión requiere un servicio autorizado. Envía historial, favoritos y direcciones a la hoja privada de tu cuenta. La copia local se conserva y se respalda antes de sincronizar. Los cambios de favoritos y direcciones se propagan. Eliminar una tarjeta sigue siendo solo local; el botón de borrado remoto elimina todo el historial GPS de la hoja con confirmación.</p>
-            <p>La conexión se configura automáticamente desde el servicio de Control GPS. No necesitas introducir códigos. Google te pedirá seleccionar tu cuenta y autorizar el acceso.</p>
+            <p>La conexión se configura automáticamente desde el servicio de Control GPS. No necesitas introducir códigos. La app intentará recuperar tu sesión al abrir. Google puede pedir autorización cuando corresponda.</p>
             <label class="toggle-row"><input id="googleConsent" type="checkbox"> Autorizo sincronizar mis ubicaciones con la hoja privada</label>
             <label class="toggle-row"><input id="googleAutoAddress" type="checkbox"> Consultar en Google la dirección aproximada de nuevas capturas (máximo una por minuto y 20 por sesión)</label>
             <button class="btn" id="googleConnectBtn" type="button">Conectar con Google</button>
@@ -388,10 +388,10 @@
     </section>
   </main>
   <footer class="foot">Control GPS · Historial y medición de distancias · El GPS necesita HTTPS o localhost y permisos del navegador.</footer>
-  <script src="gps-sync.js?v=20261031-auto-names-1"></script>
-  <script src="gps-session.js?v=20261031-auto-names-1"></script>
-  <script src="gps-google-service.js?v=20261101-session-1"></script>
-  <script src="gps-google.js?v=20261031-auto-names-1"></script>
+  <script src="gps-sync.js?v=20261101-auto-names-2"></script>
+  <script src="gps-session.js?v=20261101-auto-names-2"></script>
+  <script src="gps-google-service.js?v=20261101-session-2"></script>
+  <script src="gps-google.js?v=20261101-auto-names-2"></script>
   <script>
     (function () {
       'use strict';

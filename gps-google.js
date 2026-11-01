@@ -24,8 +24,8 @@
     const chosen=validService(published.clientId,published.deploymentId)?published:
       validService(config.clientId,config.deploymentId)?config:null;
     const service=chosen?{clientId:chosen.clientId.trim(),deploymentId:chosen.deploymentId.trim()}:null;
-    const bridgeUrl=root.GpsSession?.validUrl(published.sessionBridgeUrl)?published.sessionBridgeUrl:null;
-    let bridge=null,useBridge=false,connecting=false;
+    const bridgeUrl=published.sessionBridgeEnabled===true&&root.GpsSession?.validUrl(published.sessionBridgeUrl)?published.sessionBridgeUrl:null;
+    let bridge=null,useBridge=false,connecting=false,silentRequest=null,autoBlocked=false;
     let token='',expires=0,engine=null,applying=false,timer,attempts=0,epoch=0,geoAt=0,geoCount=0,geoBusy=false,clearing=false,tabRelease;
     function status(message){$('googleSyncStatus').textContent=message+(engine?.data.audit.length?' Conflictos conservados: '+engine.data.audit.length+'.':'');}
     function persistConfig(){localStorage.setItem(CONFIG,JSON.stringify(config));}
@@ -40,7 +40,34 @@
       if(session!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
       useBridge=true;token='';expires=0;
     }
-    async function send(request){
+    function acceptToken(response){
+      if(response.error||!response.access_token||!Number.isFinite(Number(response.expires_in))||Number(response.expires_in)<=60)throw Object.assign(Error('Google requiere confirmar el acceso. Pulsa Conectar con Google.'),{permanent:true});
+      if(!root.google.accounts.oauth2.hasGrantedAllScopes(response,...scopes))throw Object.assign(Error('Faltan permisos. Pulsa Conectar con Google para autorizarlos.'),{permanent:true});
+      token=response.access_token;expires=Date.now()+(Number(response.expires_in)-60)*1000;
+    }
+    async function silentToken(){
+      if(autoBlocked)throw Object.assign(Error('El navegador requiere pulsar Conectar con Google para recuperar el acceso.'),{permanent:true});
+      if(silentRequest)return silentRequest;
+      const session=epoch;
+      silentRequest=(async()=>{
+        await loadGis();
+        if(session!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
+        return new Promise((resolve,reject)=>{
+          let settled=false;
+          const fail=()=>{if(settled)return;settled=true;clearTimeout(timeout);autoBlocked=true;reject(Object.assign(Error('Google o el navegador requieren pulsar Conectar con Google para recuperar el acceso.'),{permanent:true}));};
+          const timeout=setTimeout(fail,15000);
+          try{
+            const client=root.google.accounts.oauth2.initTokenClient({client_id:service.clientId,scope:scopes.join(' '),include_granted_scopes:false,...(config.loginHint?{login_hint:config.loginHint}:{}),
+              callback:response=>{if(settled)return;settled=true;clearTimeout(timeout);
+                if(session!==epoch){reject(Object.assign(Error('Conexión cancelada.'),{permanent:true}));return;}
+                try{acceptToken(response);resolve();}catch(error){autoBlocked=true;reject(error);}},error_callback:fail});
+            client.requestAccessToken({prompt:'none'});
+          }catch{fail();}
+        });
+      })();
+      try{return await silentRequest;}finally{silentRequest=null;}
+    }
+    async function send(request,retried=false){
       const started=epoch;
       if(!useBridge&&(!token||Date.now()>=expires)&&bridgeUrl)await activateBridge(started);
       if(useBridge){
@@ -48,7 +75,7 @@
         if(started!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
         return result;
       }
-      if(!token||Date.now()>=expires)throw Object.assign(Error('Sesión vencida. Pulsa Conectar con Google.'),{permanent:true});
+      if(!token||Date.now()>=expires)await silentToken();
       const session=epoch,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),45000);
       let res;
       try{res=await fetch('https://script.googleapis.com/v1/scripts/'+encodeURIComponent(service.deploymentId)+':run',{
@@ -56,6 +83,7 @@
         headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({function:'gpsApi',parameters:[request],devMode:false})
       });}finally{clearTimeout(timeout);}
       if(session!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
+      if(res.status===401&&!retried){await silentToken();return send(request,true);}
       if(!res.ok)throw Object.assign(Error(res.status===401?'Sesión vencida. Vuelve a conectar.':res.status===403?'Acceso denegado. Revisa cuenta, permisos y proyecto OAuth.':'Google respondió HTTP '+res.status+'.'),{permanent:res.status!==408&&res.status!==429&&res.status<500});
       const operation=await res.json();
       if(operation.error){
@@ -85,10 +113,8 @@
     }
     async function connect(response,session,native=false){
       if(session!==epoch)return;
-      if(!native&&(response.error||!response.access_token)){status('No se autorizó la conexión con Google.');return;}
-      if(!native&&!root.google.accounts.oauth2.hasGrantedAllScopes(response,...scopes)){status('Faltan permisos. La sincronización sigue desactivada.');return;}
-      if(!native){token=response.access_token;expires=Date.now()+Math.max(0,Number(response.expires_in)-60)*1000;}
       try{
+        if(!native){acceptToken(response);autoBlocked=false;}
         if(!navigator.locks)throw Error('Este navegador no permite proteger la sincronización entre pestañas. Usa una versión actual.');
         const acquired=await new Promise((resolve,reject)=>{
           navigator.locks.request('control-gps-google-session',{ifAvailable:true},async lock=>{
@@ -124,11 +150,14 @@
       }catch(error){stop('No conectado: '+error.message);}
     }
     async function resume(){
-      if(!service||!config.consent||!bridgeUrl||connecting||engine?.ready)return;
+      if(!service||!config.consent||connecting||engine?.ready||autoBlocked&&!bridgeUrl)return;
       if(config.deploymentId&&config.deploymentId!==service.deploymentId){status('La conexión guardada corresponde a otro servicio. Datos locales conservados.');return;}
       connecting=true;$('googleConnectBtn').disabled=true;const session=++epoch;
       status('Recuperando tu sesión privada de Google…');
-      try{await activateBridge(session);await connect({},session,true);}
+      try{
+        if(bridgeUrl)await activateBridge(session);else await silentToken();
+        await connect({},session,true);
+      }
       catch(error){if(session===epoch)stop(error.message+' Pulsa Conectar con Google si necesitas autorizar.');}
       finally{connecting=false;if(session===epoch)$('googleConnectBtn').disabled=!!engine?.ready;}
     }
@@ -137,8 +166,7 @@
       config.consent=$('googleConsent').checked;persistConfig();
       if(!config.consent)stop();
       else if(!service)status('El propietario aún no ha activado el servicio de Google. Tus ubicaciones siguen guardadas localmente.');
-      else if(bridgeUrl)resume();
-      else loadGis().then(()=>status('Acceso a Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
+      else resume();
     });
     $('googleAutoAddress').addEventListener('change',()=>{config.autoAddress=$('googleAutoAddress').checked;persistConfig();});
     $('googleConnectBtn').addEventListener('click',()=>{
@@ -227,8 +255,7 @@
     status(service
       ? 'Sincronización desactivada. Autoriza el envío y pulsa Conectar con Google.'
       : 'Sincronización local disponible. El propietario aún no ha activado el servicio privado de Google.');
-    if(service&&config.consent&&bridgeUrl)resume();
-    else if(service&&config.consent)loadGis().then(()=>status('Google preparado. Pulsa Conectar con Google.')).catch(e=>status(e.message));
+    if(service&&config.consent)resume();
     function prepareLocalClear(){
       stop('Sincronización pausada al borrar información local. Reconectar recupera los registros remotos.');
       try{

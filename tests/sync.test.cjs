@@ -148,15 +148,17 @@ test('published app preserves current CSS and local key; all scripts parse',()=>
   for(const match of after.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
   for(const file of ['gps-sync.js','gps-google-service.js','gps-google.js','gps-session.js'])new vm.Script(fs.readFileSync(path.join(dir,file),'utf8'));
 });
-function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false,confirmValue=true,promptValue='BORRAR HISTORIAL',native=false}={}){
+function adapter(s,{consent=false,httpStatus=200,publishedConfig=null,withoutSavedIds=false,confirmValue=true,promptValue='BORRAR HISTORIAL',native=false,silentBlocked=false,clock=null}={}){
   const storage=memory();storage.setItem('gpsGoogleConfigV1',JSON.stringify(withoutSavedIds?{consent}:{clientId:'testclient.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',consent}));storage.setItem('gpsTrackerState',JSON.stringify({days:{original:'preserved'},geoapifyKey:'local-only-secret'}));
   const elements=new Map(),requests=[],timers=new Map(),windowEvents={},documentEvents={},oauth=[];let timer=0,revoked=false;
   function element(id){if(!elements.has(id))elements.set(id,{value:'',checked:false,textContent:'',disabled:false,listeners:{},addEventListener(name,cb){this.listeners[name]=cb;}});return elements.get(id);}
-  const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:(name,fn)=>{windowEvents[name]=fn;},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:request=>{oauth.push({options,request});return options.callback({access_token:'memory-token',expires_in:3600});}})}}}};
+  const win={CONTROL_GPS_GOOGLE_SERVICE:publishedConfig,GpsSync:require('../gps-sync.js'),addEventListener:(name,fn)=>{windowEvents[name]=fn;},google:{accounts:{oauth2:{hasGrantedAllScopes:()=>true,revoke:()=>{revoked=true;},initTokenClient:options=>({requestAccessToken:request=>{oauth.push({options,request});if(request.prompt==='none'&&silentBlocked)return options.error_callback({type:'popup_failed_to_open'});return options.callback({access_token:oauth.length===1?'memory-token':'memory-token-'+oauth.length,expires_in:3600});}})}}}};
   if(native)win.GpsSession={validUrl:()=>true,Bridge:class{async connect(){}close(){}async call(request){requests.push({native:true,request});return s.call(request);}}};
-  const ctx=vm.createContext({window:win,document:{getElementById:element,addEventListener:(name,fn)=>{documentEvents[name]=fn;},hidden:false},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>confirmValue,prompt:()=>promptValue,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
+  const ClockDate=class extends Date{static now(){return clock?clock.now:Date.now();}};
+  const ctx=vm.createContext({Date:ClockDate,window:win,document:{getElementById:element,addEventListener:(name,fn)=>{documentEvents[name]=fn;},hidden:false},localStorage:storage,navigator:{locks:{request:async(n,o,fn)=>fn({})}},crypto:require('node:crypto').webcrypto,AbortController,confirm:()=>confirmValue,prompt:()=>promptValue,setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),fetch:async(url,options)=>{
     const request=JSON.parse(options.body);requests.push({url,options,request});
-    return {ok:httpStatus===200,status:httpStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
+    const responseStatus=typeof httpStatus==='function'?httpStatus(request.parameters[0]):httpStatus;
+    return {ok:responseStatus===200,status:responseStatus,json:async()=>({done:true,response:{result:s.call(request.parameters[0])}})};
   }});
   vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../gps-google.js'),'utf8'),ctx);
   const current=snapshot('Privada'),diagnostics=[];
@@ -334,19 +336,19 @@ test('name validation rejects malformed coordinates and writes inert JSON',()=>{
   s.call({action:'push',clientVersion:3,historyEpoch:'initial',operations:[op]});assert.equal(JSON.parse(s.data[1][8]).name,'=IMPORTXML("private")');assert.ok(s.data[1][8].startsWith('{'));
 });
 test('OAuth reuses the authorized account without forcing account selection',async()=>{
-  const a=adapter(server(),{consent:true});a.click('googleConnectBtn');await settle();
+  const a=adapter(server(),{consent:false});a.element('googleConsent').checked=true;a.click('googleConnectBtn');await settle();
   assert.equal(a.oauth[0].request.prompt,'');assert.equal(JSON.parse(a.storage.getItem('gpsGoogleConfigV1')).loginHint,'owner@example.test');
   a.emit('pageshow');a.visible();a.emit('online');await settle();assert.equal(a.oauth.length,1);assert.equal(a.api.connected(),true);
   a.click('googleDisconnectBtn');assert.equal(JSON.parse(a.storage.getItem('gpsGoogleConfigV1')).loginHint,undefined);
 });
 test('activated private session connects and syncs on startup without GIS or a manual click',async()=>{
-  const a=adapter(server(),{consent:true,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
+  const a=adapter(server(),{consent:true,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeEnabled:true,sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
   await settle();assert.equal(a.api.connected(),true);assert.ok(a.requests.length>=3);assert.ok(a.requests.every(r=>r.native));assert.equal(a.oauth.length,0);
   assert.ok(!a.storage.getItem('gpsGoogleConfigV1').includes('token'));assert.ok(a.storage.getItem('gpsSyncBackupV1'));
   a.click('googleDisconnectBtn');const before=a.requests.length;a.emit('pageshow');a.visible();await settle();assert.equal(a.requests.length,before);assert.equal(a.api.connected(),false);
 });
 test('a private session never starts before consent',async()=>{
-  const a=adapter(server(),{consent:false,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
+  const a=adapter(server(),{consent:false,native:true,publishedConfig:{clientId:'test.apps.googleusercontent.com',deploymentId:'deployment_for_test_1234567890',sessionBridgeEnabled:true,sessionBridgeUrl:'https://script.google.com/macros/s/bridge_deployment_1234567890/exec'}});
   a.emit('pageshow');a.visible();await settle();assert.equal(a.requests.length,0);assert.equal(a.oauth.length,0);
 });
 test('private bridge server requires the active owner and never emits credentials',()=>{
@@ -400,4 +402,26 @@ test('names persist in local state and export, and JSON import adds them without
   assert.equal(saved.names['4.600000,-74.100000'],'Casa');assert.equal(JSON.parse(await blob.text()).names['4.600000,-74.100000'],'Casa');
   ctx.input=JSON.stringify({locations:[],names:{'4.600000,-74.100000':'No reemplazar','40.758000,-73.985500':'Times Square','bad':'inválido'}});
   await vm.runInNewContext('importText(input,true)',ctx);assert.equal(state.names['4.600000,-74.100000'],'Casa');assert.equal(state.names['40.758000,-73.985500'],'Times Square');assert.equal(state.names.bad,undefined);assert.ok(rendered>0);
+});
+
+test('remembered consent starts silent Google authorization and synchronization automatically',async()=>{
+  const a=adapter(server(),{consent:true});await settle();assert.equal(a.api.connected(),true);assert.equal(a.oauth.length,1);assert.equal(a.oauth[0].request.prompt,'none');
+  assert.ok(a.requests.length>=3);assert.ok(a.storage.getItem('gpsSyncBackupV1'));assert.ok(!a.storage.getItem(KEY).includes('memory-token'));assert.ok(!a.storage.getItem('gpsGoogleConfigV1').includes('memory-token'));
+});
+test('popup blocking stops automatic attempts and leaves one prepared manual connect action',async()=>{
+  const a=adapter(server(),{consent:true,silentBlocked:true});await settle();
+  assert.equal(a.api.connected(),false);assert.equal(a.requests.length,0);assert.equal(a.oauth.length,1);assert.match(a.element('googleSyncStatus').textContent,/Conectar con Google/);assert.equal(a.element('googleConnectBtn').disabled,false);
+  a.emit('online');a.emit('pageshow');a.visible();await settle();assert.equal(a.oauth.length,1);
+  a.click('googleConnectBtn');await settle();assert.equal(a.api.connected(),true);assert.deepEqual(a.oauth.map(o=>o.request.prompt),['none','']);
+});
+test('expired tokens renew silently on return while retaining the same durable queue and records',async()=>{
+  const s=server(),clock={now:Date.now()},a=adapter(s,{consent:true,clock});await settle();
+  const before=s.data.filter(r=>r[3]==='record').length;
+  a.current['address|4.600000,-74.100000'].value.address='Actualizada al volver';a.api.changed();clock.now+=3600001;a.emit('online');await settle();
+  assert.equal(a.api.connected(),true);assert.equal(a.oauth.length,2);assert.ok(a.oauth.every(o=>o.request.prompt==='none'));
+  assert.equal(JSON.parse(a.storage.getItem(KEY)).pending.length,0);assert.equal(s.data.filter(r=>r[3]==='record').length,before);assert.equal(JSON.parse(s.data.at(-1)[8]).address,'Actualizada al volver');
+});
+test('one unauthorized API response renews access once and retries without duplicate operations',async()=>{
+  let failNext=false;const s=server(),a=adapter(s,{consent:true,httpStatus:()=>{if(failNext){failNext=false;return 401;}return 200;}});await settle();
+  const before=s.data.length;failNext=true;a.emit('online');await settle();assert.equal(a.api.connected(),true);assert.equal(a.oauth.length,2);assert.equal(s.data.length,before);
 });
