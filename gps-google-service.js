@@ -3,7 +3,7 @@
  * Los usuarios no introducen ningún código.
  * Mantener OAuth con consentimiento y el API ejecutable con acceso restringido.
  * No añadir IDs de hojas, claves privadas, contraseñas ni tokens.
- * API ejecutable existente verificado el 2026-10-31, actualizado a versión 2, acceso Solo yo.
+ * API ejecutable existente verificado el 2026-10-31, actualizado a versión 3, acceso Solo yo.
  * Cliente OAuth web existente facilitado por el propietario el 2026-10-31.
  * La configuración pública permite conectar desde dispositivos nuevos.
  * Los tokens siguen siendo temporales y requieren autorización de Google.
@@ -11,7 +11,7 @@
 window.CONTROL_GPS_GOOGLE_SERVICE=Object.freeze({
   clientId:'142119703617-089dbvcvfblkf0cmlbkjdg358t0rjtsp.apps.googleusercontent.com',
   deploymentId:'AKfycbwCROqvztyP393Th01zLu2W1SSRJ_ljM3_6qa1a8GOKGxfzR6cG-7A1m99hlD3RsjfV',
-  // Pending owner-session deployment and live verification; never invent a URL.
-  sessionBridgeUrl:''
+  // Private Web App: USER_ACCESSING / MYSELF, in the same existing project.
+  sessionBridgeUrl:'https://script.google.com/macros/s/AKfycbxBEGzm9wjMe8P3hxhqRqHlefiLNdqDLYc05d0NlsWFu9viVg7_E4sWR10K0V5MiISH/exec'
 });
 
