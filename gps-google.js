@@ -54,7 +54,9 @@
         if(session!==epoch)throw Object.assign(Error('Conexión cancelada.'),{permanent:true});
         return new Promise((resolve,reject)=>{
           let settled=false;
-          const fail=()=>{if(settled)return;settled=true;clearTimeout(timeout);autoBlocked=true;reject(Object.assign(Error('Google o el navegador requieren pulsar Conectar con Google para recuperar el acceso.'),{permanent:true}));};
+          const fail=error=>{if(settled)return;settled=true;clearTimeout(timeout);autoBlocked=true;
+            const message=error?.type==='popup_failed_to_open'?'El navegador bloqueó la ventana de Google. Pulsa Conectar con Google.':error?.type==='popup_closed'?'Se cerró la ventana de Google. Pulsa Conectar con Google.':'Google no confirmó el acceso automático. Pulsa Conectar con Google.';
+            reject(Object.assign(Error(message),{permanent:true}));};
           const timeout=setTimeout(fail,15000);
           try{
             const client=root.google.accounts.oauth2.initTokenClient({client_id:service.clientId,scope:scopes.join(' '),include_granted_scopes:false,...(config.loginHint?{login_hint:config.loginHint}:{}),
@@ -158,7 +160,7 @@
         if(bridgeUrl)await activateBridge(session);else await silentToken();
         await connect({},session,true);
       }
-      catch(error){if(session===epoch)stop(error.message+' Pulsa Conectar con Google si necesitas autorizar.');}
+      catch(error){if(session===epoch)stop(error.message+(error.message.includes('Conectar con Google')?'':' Pulsa Conectar con Google si necesitas autorizar.'));}
       finally{connecting=false;if(session===epoch)$('googleConnectBtn').disabled=!!engine?.ready;}
     }
     $('googleConsent').checked=config.consent===true;$('googleAutoAddress').checked=config.autoAddress===true;

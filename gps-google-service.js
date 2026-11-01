@@ -13,7 +13,7 @@ window.CONTROL_GPS_GOOGLE_SERVICE=Object.freeze({
   deploymentId:'AKfycbwCROqvztyP393Th01zLu2W1SSRJ_ljM3_6qa1a8GOKGxfzR6cG-7A1m99hlD3RsjfV',
   // The embedded Google login returned HTTP 401 in the connected browser.
   sessionBridgeEnabled:false,
-  // Private Web App: USER_ACCESSING / MYSELF, in the same existing project.
-  sessionBridgeUrl:'https://script.google.com/macros/s/AKfycbxBEGzm9wjMe8P3hxhqRqHlefiLNdqDLYc05d0NlsWFu9viVg7_E4sWR10K0V5MiISH/exec'
+  // The private test Web App was archived after diagnosis.
+  sessionBridgeUrl:''
 });
 
